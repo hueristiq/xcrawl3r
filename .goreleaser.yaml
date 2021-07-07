@@ -1,0 +1,24 @@
+builds:
+    -
+        binary: sigrawl3r
+        main: cmd/sigrawl3r/main.go
+        goos:
+            - linux
+            - windows
+            - darwin
+        goarch:
+            - amd64
+            - 386
+            - arm
+            - arm64
+
+archives:
+    -
+        id: tgz
+        format: tar.gz
+        replacements:
+            darwin: macOS
+        format_overrides:
+            -
+                goos: windows
+                format: zip
