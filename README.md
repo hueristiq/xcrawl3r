@@ -4,12 +4,37 @@
 
 ## Resources
 
-* [Usage](#usage)
 * [Installation](#installation)
     * [From Binary](#from-binary)
     * [From source](#from-source)
     * [From github](#from-github)
+* [Usage](#usage)
 * [Contribution](#contribution)
+
+
+## Installation
+
+#### From Binary
+
+You can download the pre-built binary for your platform from this repository's [releases](https://github.com/signedsecurity/sigrawl3r/releases/) page, extract, then move it to your `$PATH`and you're ready to go.
+
+#### From Source
+
+sigrawl3r requires **go1.14+** to install successfully. Run the following command to get the repo
+
+```bash
+GO111MODULE=on go get -u -v github.com/signedsecurity/sigrawl3r/cmd/sigrawl3r
+```
+
+#### From Github
+
+```bash
+git clone https://github.com/signedsecurity/sigrawl3r.git && \
+cd sigrawl3r/cmd/sigrawl3r/ && \
+go build . && \
+mv sigrawl3r /usr/local/bin/ && \
+sigrawl3r -h
+```
 
 ## Usage
 
@@ -41,26 +66,6 @@ OPTIONS:
   -x              comma separated list of proxies
 ```
 
-## Installation
-
-#### From Binary
-
-You can download the pre-built binary for your platform from this repository's [releases](https://github.com/signedsecurity/sigrawl3r/releases/) page, extract, then move it to your `$PATH`and you're ready to go.
-
-#### From Source
-
-sigrawl3r requires **go1.14+** to install successfully. Run the following command to get the repo
-
-```bash
-GO111MODULE=on go get -u -v github.com/signedsecurity/sigrawl3r/cmd/sigrawl3r
-```
-
-#### From Github
-
-```bash
-git clone https://github.com/signedsecurity/sigrawl3r.git; cd sigrawl3r/cmd/sigrawl3r/; go build; mv sigrawl3r /usr/local/bin/; sigrawl3r -h
-```
-
-## Contibution
+## Contribution
 
 [Issues](https://github.com/signedsecurity/sigrawl3r/issues) and [Pull Requests](https://github.com/signedsecurity/sigrawl3r/pulls) are welcome! 
