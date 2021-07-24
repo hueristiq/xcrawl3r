@@ -13,10 +13,11 @@ import (
 	"sync"
 
 	"github.com/logrusorgru/aurora/v3"
-	"github.com/signedsecurity/sigrawl3r/pkg/sigrawl3r"
+	"github.com/signedsecurity/sigrawl3r/internal/options"
+	"github.com/signedsecurity/sigrawl3r/internal/runner"
 )
 
-type options struct {
+type Options struct {
 	noColor bool
 	silent  bool
 	URLs    string
@@ -24,9 +25,9 @@ type options struct {
 }
 
 var (
-	co options
-	au aurora.Aurora
-	so sigrawl3r.Options
+	co   Options
+	au   aurora.Aurora
+	opts options.Options
 )
 
 func banner() {
@@ -41,18 +42,18 @@ func banner() {
 }
 
 func init() {
-	flag.BoolVar(&so.Debug, "debug", false, "")
-	flag.IntVar(&so.RandomDelay, "random-delay", 2, "")
-	flag.IntVar(&so.Depth, "depth", 1, "")
+	flag.BoolVar(&opts.Debug, "debug", false, "")
+	flag.IntVar(&opts.RandomDelay, "random-delay", 2, "")
+	flag.IntVar(&opts.Depth, "depth", 1, "")
 	flag.StringVar(&co.URLs, "iL", "", "")
-	flag.BoolVar(&so.IncludeSubs, "iS", false, "")
+	flag.BoolVar(&opts.IncludeSubs, "iS", false, "")
 	flag.BoolVar(&co.noColor, "nC", false, "")
 	flag.StringVar(&co.output, "oJ", "", "")
 	flag.BoolVar(&co.silent, "silent", false, "")
-	flag.IntVar(&so.Threads, "threads", 20, "")
-	flag.IntVar(&so.Timeout, "timeout", 10, "")
-	flag.StringVar(&so.UserAgent, "UA", "", "")
-	flag.StringVar(&so.Proxies, "proxies", "", "")
+	flag.IntVar(&opts.Threads, "threads", 20, "")
+	flag.IntVar(&opts.Timeout, "timeout", 10, "")
+	flag.StringVar(&opts.UserAgent, "UA", "", "")
+	flag.StringVar(&opts.Proxies, "proxies", "", "")
 
 	flag.Usage = func() {
 		banner()
@@ -91,10 +92,14 @@ func main() {
 		banner()
 	}
 
-	options, err := sigrawl3r.ParseOptions(&so)
-	if err != nil {
+	if err := opts.Parse(); err != nil {
 		log.Fatalln(err)
 	}
+
+	// options, err := sigrawl3r.ParseOptions(&opts)
+	// if err != nil {
+	// 	log.Fatalln(err)
+	// }
 
 	URLs := make(chan string)
 
@@ -136,7 +141,7 @@ func main() {
 	}()
 
 	var wg sync.WaitGroup
-	var output sigrawl3r.Results
+	var output runner.Results
 
 	for URL := range URLs {
 		wg.Add(1)
@@ -144,12 +149,12 @@ func main() {
 		go func(URL string) {
 			defer wg.Done()
 
-			crawler, err := sigrawl3r.New(URL, options)
+			runner, err := runner.New(URL, &opts)
 			if err != nil {
 				log.Fatalln(err)
 			}
 
-			results, err := crawler.Run(URL)
+			results, err := runner.Run(URL)
 			if err != nil {
 				log.Fatalln(err)
 			}
@@ -168,7 +173,7 @@ func main() {
 	}
 }
 
-func saveResults(outputPath string, output sigrawl3r.Results) error {
+func saveResults(outputPath string, output runner.Results) error {
 	if _, err := os.Stat(outputPath); os.IsNotExist(err) {
 		directory, filename := path.Split(outputPath)
 

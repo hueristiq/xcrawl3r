@@ -1,4 +1,4 @@
-package sigrawl3r
+package runner
 
 import (
 	"crypto/tls"
@@ -16,30 +16,28 @@ import (
 	"github.com/gocolly/colly/v2/debug"
 	"github.com/gocolly/colly/v2/extensions"
 	"github.com/gocolly/colly/v2/proxy"
-	"github.com/signedsecurity/sigrawl3r/pkg/sigrawl3r/exts"
+	"github.com/signedsecurity/sigrawl3r/internal/options"
+	"github.com/signedsecurity/sigrawl3r/internal/runner/exts"
 )
 
-type sigrawl3r struct {
-	Options    *Options
+type Runner struct {
 	URL        *urlx.URL
+	Options    *options.Options
 	PCollector *colly.Collector
 	JCollector *colly.Collector
 }
 
-func New(URL string, options *Options) (crawler sigrawl3r, err error) {
-	crawler.Options = options
-
-	parsedURL, err := urlx.Parse(URL)
+func New(URL string, options *options.Options) (runner Runner, err error) {
+	runner.URL, err = urlx.Parse(URL)
 	if err != nil {
-		return crawler, err
+		return runner, err
 	}
 
-	crawler.URL = parsedURL
+	runner.Options = options
 
-	eTLDPlus1 := parsedURL.ETLDPlus1
+	eTLDPlus1 := runner.URL.ETLDPlus1
 	escapedETLDPlus1 := strings.ReplaceAll(eTLDPlus1, ".", "\\.")
 
-	// Instantiate default collector
 	pCollector := colly.NewCollector(
 		colly.Async(true),
 		colly.MaxDepth(options.Depth),
@@ -77,11 +75,11 @@ func New(URL string, options *Options) (crawler sigrawl3r, err error) {
 	// NOTE: Must come BEFORE .SetClient calls
 	tr := &http.Transport{
 		DialContext: (&net.Dialer{
-			Timeout:   time.Duration(crawler.Options.Timeout) * time.Second,
-			KeepAlive: time.Duration(crawler.Options.Timeout) * time.Second,
+			Timeout:   time.Duration(runner.Options.Timeout) * time.Second,
+			KeepAlive: time.Duration(runner.Options.Timeout) * time.Second,
 		}).DialContext,
 		MaxIdleConns:    100, // Golang default is 100
-		IdleConnTimeout: time.Duration(crawler.Options.Timeout) * time.Second,
+		IdleConnTimeout: time.Duration(runner.Options.Timeout) * time.Second,
 	}
 
 	tr.TLSClientConfig = &tls.Config{
@@ -96,43 +94,43 @@ func New(URL string, options *Options) (crawler sigrawl3r, err error) {
 
 	// Setup proxy if supplied
 	// NOTE: Must come AFTER .SetClient calls
-	if crawler.Options.Proxies != "" {
-		proxiesURLs := strings.Split(crawler.Options.Proxies, ",")
+	if runner.Options.Proxies != "" {
+		proxiesURLs := strings.Split(runner.Options.Proxies, ",")
 
 		rrps, err := proxy.RoundRobinProxySwitcher(proxiesURLs...)
 		if err != nil {
-			return crawler, err
+			return runner, err
 		}
 
 		pCollector.SetProxyFunc(rrps)
 	}
 
 	pCollector.SetRequestTimeout(
-		time.Duration(crawler.Options.Timeout) * time.Second,
+		time.Duration(runner.Options.Timeout) * time.Second,
 	)
 
-	// Limit the number of threads started by colly to `crawler.Options.Threads`
+	// Limit the number of threads started by colly to `runner.Options.Threads`
 	// when visiting links which domains' matches `*parsedURL.ETLDPlus1` glob
 	err = pCollector.Limit(&colly.LimitRule{
-		DomainGlob:  fmt.Sprintf("*%s", parsedURL.ETLDPlus1),
-		Parallelism: crawler.Options.Threads,
-		RandomDelay: time.Duration(crawler.Options.RandomDelay) * time.Second,
+		DomainGlob:  fmt.Sprintf("*%s", runner.URL.ETLDPlus1),
+		Parallelism: runner.Options.Threads,
+		RandomDelay: time.Duration(runner.Options.RandomDelay) * time.Second,
 	})
 	if err != nil {
-		return crawler, err
+		return runner, err
 	}
 
 	jCollector := pCollector.Clone()
 	jCollector.URLFilters = nil
 
-	crawler.PCollector = pCollector
-	crawler.JCollector = jCollector
+	runner.PCollector = pCollector
+	runner.JCollector = jCollector
 
-	return crawler, nil
+	return runner, nil
 }
 
 // Run is a
-func (crawler *sigrawl3r) Run(URL string) (results Results, err error) {
+func (runner *Runner) Run(URL string) (results Results, err error) {
 	var URLs sync.Map
 	var buckets sync.Map
 
@@ -142,7 +140,7 @@ func (crawler *sigrawl3r) Run(URL string) (results Results, err error) {
 	jsRegex := regexp.MustCompile(`(?m).*?\.*(js|json|xml|csv|txt)(\?.*?|)$`)
 	ignoreRegex := regexp.MustCompile(`(?m).*?\.*(jpg|png|gif|webp|psd|raw|bmp|heif|ico|css|pdf|jpeg|css|tif|tiff|ttf|woff|woff2|pdf|doc|svg|mp3|mp4|eot)(\?.*?|)$`)
 
-	crawler.PCollector.OnRequest(func(request *colly.Request) {
+	runner.PCollector.OnRequest(func(request *colly.Request) {
 		reqURL := request.URL.String()
 
 		// If it's a javascript, json, xml, csv or txt file, ensure we pass it to the JCollector
@@ -155,12 +153,12 @@ func (crawler *sigrawl3r) Run(URL string) (results Results, err error) {
 					return
 				}
 
-				crawler.JCollector.Visit(js)
+				runner.JCollector.Visit(js)
 
 				URLs.Store(js, struct{}{})
 			}
 
-			crawler.JCollector.Visit(reqURL)
+			runner.JCollector.Visit(reqURL)
 
 			// Cancel the request to ensure we don't process it on this collector
 			request.Abort()
@@ -174,7 +172,7 @@ func (crawler *sigrawl3r) Run(URL string) (results Results, err error) {
 		}
 	})
 
-	crawler.PCollector.OnError(func(response *colly.Response, err error) {
+	runner.PCollector.OnError(func(response *colly.Response, err error) {
 		if response.StatusCode == 404 || response.StatusCode == 429 || response.StatusCode < 100 || response.StatusCode >= 500 {
 			return
 		}
@@ -185,14 +183,14 @@ func (crawler *sigrawl3r) Run(URL string) (results Results, err error) {
 			return
 		}
 
-		if ok := crawler.record("[url]", u); ok {
+		if ok := runner.record("[url]", u); ok {
 			URLsSlice = append(URLsSlice, u)
 		}
 
 		URLs.Store(u, struct{}{})
 	})
 
-	crawler.PCollector.OnResponse(func(response *colly.Response) {
+	runner.PCollector.OnResponse(func(response *colly.Response) {
 		// s3 buckets
 		S3s, err := exts.S3finder(string(response.Body))
 		if err != nil {
@@ -211,7 +209,7 @@ func (crawler *sigrawl3r) Run(URL string) (results Results, err error) {
 		}
 	})
 
-	crawler.PCollector.OnHTML("[href]", func(e *colly.HTMLElement) {
+	runner.PCollector.OnHTML("[href]", func(e *colly.HTMLElement) {
 		link := e.Attr("href")
 
 		// Get the absolute URL
@@ -235,7 +233,7 @@ func (crawler *sigrawl3r) Run(URL string) (results Results, err error) {
 			return
 		}
 
-		URL := fixURL(absoluteURL, crawler.URL)
+		URL := fixURL(absoluteURL, runner.URL)
 
 		if _, exists := URLs.Load(URL); exists {
 			return
@@ -243,14 +241,14 @@ func (crawler *sigrawl3r) Run(URL string) (results Results, err error) {
 
 		e.Request.Visit(URL)
 
-		if ok := crawler.record("[url]", URL); ok {
+		if ok := runner.record("[url]", URL); ok {
 			URLsSlice = append(URLsSlice, URL)
 		}
 
 		URLs.Store(URL, struct{}{})
 	})
 
-	crawler.PCollector.OnHTML("script[src]", func(e *colly.HTMLElement) {
+	runner.PCollector.OnHTML("script[src]", func(e *colly.HTMLElement) {
 		link := e.Attr("src")
 
 		// Get the absolute URL
@@ -267,22 +265,22 @@ func (crawler *sigrawl3r) Run(URL string) (results Results, err error) {
 			return
 		}
 
-		URL := fixURL(absoluteURL, crawler.URL)
+		URL := fixURL(absoluteURL, runner.URL)
 
 		if _, exists := URLs.Load(URL); exists {
 			return
 		}
 
-		crawler.PCollector.Visit(URL)
+		runner.PCollector.Visit(URL)
 
-		if ok := crawler.record("[js]", URL); ok {
+		if ok := runner.record("[js]", URL); ok {
 			URLsSlice = append(URLsSlice, URL)
 		}
 
 		URLs.Store(URL, struct{}{})
 	})
 
-	crawler.JCollector.OnResponse(func(response *colly.Response) {
+	runner.JCollector.OnResponse(func(response *colly.Response) {
 		endpoints, err := exts.Linkfinder(string(response.Body))
 		if err != nil {
 			return
@@ -314,15 +312,15 @@ func (crawler *sigrawl3r) Run(URL string) (results Results, err error) {
 				return
 			}
 
-			URL := fixURL(absoluteURL, crawler.URL)
+			URL := fixURL(absoluteURL, runner.URL)
 
 			if _, exists := URLs.Load(URL); exists {
 				return
 			}
 
-			crawler.PCollector.Visit(URL)
+			runner.PCollector.Visit(URL)
 
-			if ok := crawler.record("[linkfinder]", URL); ok {
+			if ok := runner.record("[linkfinder]", URL); ok {
 				URLsSlice = append(URLsSlice, URL)
 			}
 
@@ -355,12 +353,12 @@ func (crawler *sigrawl3r) Run(URL string) (results Results, err error) {
 	go func() {
 		defer wg.Done()
 
-		crawler.PCollector.Visit(crawler.URL.String())
+		runner.PCollector.Visit(runner.URL.String())
 	}()
 
 	wg.Wait()
-	crawler.PCollector.Wait()
-	crawler.JCollector.Wait()
+	runner.PCollector.Wait()
+	runner.JCollector.Wait()
 
 	results.URLs = URLsSlice
 	results.Buckets = bucketsSlice
@@ -368,7 +366,7 @@ func (crawler *sigrawl3r) Run(URL string) (results Results, err error) {
 	return results, nil
 }
 
-func (crawler *sigrawl3r) record(tag string, URL string) (print bool) {
+func (crawler *Runner) record(tag string, URL string) (print bool) {
 	URL = decode(URL)
 
 	parsedURL, err := urlx.Parse(URL)

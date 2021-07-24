@@ -1,4 +1,4 @@
-package sigrawl3r
+package runner
 
 type Results struct {
 	URLs    []string `json:"urls,omitempty"`

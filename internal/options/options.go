@@ -1,4 +1,4 @@
-package sigrawl3r
+package options
 
 type Options struct {
 	Debug       bool
@@ -11,6 +11,6 @@ type Options struct {
 	UserAgent   string
 }
 
-func ParseOptions(options *Options) (*Options, error) {
-	return options, nil
+func (options *Options) Parse() (err error) {
+	return
 }

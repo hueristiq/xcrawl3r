@@ -1,4 +1,4 @@
-package sigrawl3r
+package runner
 
 import (
 	"strings"
