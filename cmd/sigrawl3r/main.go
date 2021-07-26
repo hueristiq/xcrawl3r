@@ -96,11 +96,6 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	// options, err := sigrawl3r.ParseOptions(&opts)
-	// if err != nil {
-	// 	log.Fatalln(err)
-	// }
-
 	URLs := make(chan string)
 
 	go func() {
