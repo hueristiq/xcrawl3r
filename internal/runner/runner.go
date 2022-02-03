@@ -132,10 +132,8 @@ func New(URL string, options *options.Options) (runner Runner, err error) {
 // Run is a
 func (runner *Runner) Run(URL string) (results Results, err error) {
 	var URLs sync.Map
-	var buckets sync.Map
 
 	URLsSlice := make([]string, 0)
-	bucketsSlice := make([]string, 0)
 
 	jsRegex := regexp.MustCompile(`(?m).*?\.*(js|json|xml|csv|txt)(\?.*?|)$`)
 	ignoreRegex := regexp.MustCompile(`(?m).*?\.*(jpg|png|gif|webp|psd|raw|bmp|heif|ico|css|pdf|jpeg|css|tif|tiff|ttf|woff|woff2|pdf|doc|svg|mp3|mp4|eot)(\?.*?|)$`)
@@ -188,25 +186,6 @@ func (runner *Runner) Run(URL string) (results Results, err error) {
 		}
 
 		URLs.Store(u, struct{}{})
-	})
-
-	runner.PCollector.OnResponse(func(response *colly.Response) {
-		// s3 buckets
-		S3s, err := exts.S3finder(string(response.Body))
-		if err != nil {
-			return
-		}
-
-		for _, S3 := range S3s {
-			if _, exists := buckets.Load(S3); exists {
-				return
-			}
-
-			fmt.Println("[s3]", S3)
-
-			bucketsSlice = append(bucketsSlice, S3)
-			buckets.Store(S3, struct{}{})
-		}
 	})
 
 	runner.PCollector.OnHTML("[href]", func(e *colly.HTMLElement) {
@@ -326,23 +305,6 @@ func (runner *Runner) Run(URL string) (results Results, err error) {
 
 			URLs.Store(URL, struct{}{})
 		}
-
-		// s3 buckets
-		S3s, err := exts.S3finder(string(response.Body))
-		if err != nil {
-			return
-		}
-
-		for _, S3 := range S3s {
-			if _, exists := buckets.Load(S3); exists {
-				return
-			}
-
-			fmt.Println("[s3]", S3)
-
-			bucketsSlice = append(bucketsSlice, S3)
-			buckets.Store(S3, struct{}{})
-		}
 	})
 
 	// setup a waitgroup to run all methods at the same time
@@ -361,7 +323,6 @@ func (runner *Runner) Run(URL string) (results Results, err error) {
 	runner.JCollector.Wait()
 
 	results.URLs = URLsSlice
-	results.Buckets = bucketsSlice
 
 	return results, nil
 }

@@ -155,7 +155,6 @@ func main() {
 			}
 
 			output.URLs = append(output.URLs, results.URLs...)
-			output.Buckets = append(output.Buckets, results.Buckets...)
 		}(URL)
 	}
 
