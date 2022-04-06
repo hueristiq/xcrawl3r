@@ -68,10 +68,10 @@ You can download the pre-built binary for your platform from this repository's [
 
 #### From Source
 
-sigrawl3r requires **go1.14+** to install successfully. Run the following command to get the repo
+sigrawl3r requires **go1.17+** to install successfully. Run the following command to get the repo
 
 ```bash
-GO111MODULE=on go get -u -v github.com/signedsecurity/sigrawl3r/cmd/sigrawl3r
+go install github.com/signedsecurity/signed-suite-cli/cmd/sigcli@latest
 ```
 
 #### From Github
