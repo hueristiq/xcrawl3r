@@ -27,29 +27,37 @@ A fast web crawler.
 ```text
 $ sigrawl3r -h
 
-     _                          _
- ___(_) __ _ _ __ __ ___      _| | ___ _ __
-/ __| |/ _` | '__/ _` \ \ /\ / / |/ _ \ '__|
-\__ \ | (_| | | | (_| |\ V  V /| |  __/ |
-|___/_|\__, |_|  \__,_| \_/\_/ |_|\___|_| v1.2.0
+     _                          _ _____      
+ ___(_) __ _ _ __ __ ___      _| |___ / _ __ 
+/ __| |/ _` | '__/ _` \ \ /\ / / | |_ \| '__|
+\__ \ | (_| | | | (_| |\ V  V /| |___) | |   
+|___/_|\__, |_|  \__,_| \_/\_/ |_|____/|_| v1.0.0
        |___/
 
 USAGE:
   sigrawl3r [OPTIONS]
 
 OPTIONS:
-  -debug          debug mode (default: false)
-  -delay          delay between requests. (default 5s)
-  -depth          maximum limit on the recursion depth of visited URLs. (default 1)
-  -iL             urls to crawl (use `iL -` to read from stdin)
-  -iS             extend scope to include subdomains (default: false)
-  -nC             no color mode
-  -oJ             JSON output file
-  -s              silent mode: print urls only (default: false)
-  -threads        maximum no. of concurrent requests (default 20)
-  -timeout        HTTP timeout (default 10s)
-  -UA             User Agent to use
-  -x              comma separated list of proxies
+  -c, --concurrency          Maximum concurrent requests for matching domains (default: 5)
+      --debug                Enable debug mode (default: false)
+  -d, --depth                Maximum recursion depth on visited URLs. (default: 1)
+      --headless             If true the browser will be displayed while crawling
+                                 Note: Requires '-r, --render' flag
+                                 Note: Usage to show browser: '--headless=false' (default true)
+      --include-subs         Extend scope to include subdomains (default: false)
+      --no-color             Enable no color mode (default: false)
+  -p, --proxy                Proxy URL (e.g: http://127.0.0.1:8080)
+  -R, --random-delay         Maximum random delay between requests (default: 2s)
+  -r, --render               Render javascript.
+  -s, --silent               Enable silent mode: output urls only (default: false)
+  -t, --threads              Number of threads (Run URLs in parallel) (default: 20)
+      --timeout              Request timeout (second) (default: 10)
+  -u, --url                  URL to crawl
+  -U, --urls                 URLs to crawl
+      --user-agent           User Agent to use (default: web)
+                                 `web` for a random web user-agent
+                                 `mobile` for a random mobile user-agent
+                                 or you can set your special user-agent
 ```
 
 ## Installation
