@@ -2,205 +2,230 @@ package main
 
 import (
 	"bufio"
-	"encoding/json"
-	"errors"
 	"flag"
 	"fmt"
 	"log"
 	"os"
-	"path"
-	"strings"
 	"sync"
 
+	"github.com/enenumxela/urlx/pkg/urlx"
 	"github.com/logrusorgru/aurora/v3"
-	"github.com/signedsecurity/sigrawl3r/internal/options"
-	"github.com/signedsecurity/sigrawl3r/internal/runner"
+	"github.com/signedsecurity/sigrawl3r/internal/configuration"
+	"github.com/signedsecurity/sigrawl3r/internal/crawler"
+	"github.com/signedsecurity/sigrawl3r/internal/utils/io"
 )
-
-type Options struct {
-	noColor bool
-	silent  bool
-	URLs    string
-	output  string
-}
 
 var (
-	co   Options
-	au   aurora.Aurora
-	opts options.Options
+	au       aurora.Aurora
+	conf     configuration.Configuration
+	URL      string
+	URLsFile string
+	silent   bool
+	noColor  bool
 )
 
-func banner() {
-	fmt.Fprintln(os.Stderr, aurora.BrightBlue(`
-     _                          _ _____      
- ___(_) __ _ _ __ __ ___      _| |___ / _ __ 
-/ __| |/ _`+"`"+` | '__/ _`+"`"+` \ \ /\ / / | |_ \| '__|
-\__ \ | (_| | | | (_| |\ V  V /| |___) | |   
-|___/_|\__, |_|  \__,_| \_/\_/ |_|____/|_| v1.0.0
-       |___/
-`).Bold())
+func displayBanner() {
+	fmt.Fprintln(os.Stderr, configuration.BANNER)
 }
 
 func init() {
-	flag.BoolVar(&opts.Debug, "debug", false, "")
-	flag.IntVar(&opts.RandomDelay, "random-delay", 2, "")
-	flag.IntVar(&opts.Depth, "depth", 1, "")
-	flag.StringVar(&co.URLs, "iL", "", "")
-	flag.BoolVar(&opts.IncludeSubs, "iS", false, "")
-	flag.BoolVar(&co.noColor, "nC", false, "")
-	flag.StringVar(&co.output, "oJ", "", "")
-	flag.BoolVar(&co.silent, "silent", false, "")
-	flag.IntVar(&opts.Threads, "threads", 20, "")
-	flag.IntVar(&opts.Timeout, "timeout", 10, "")
-	flag.StringVar(&opts.UserAgent, "UA", "", "")
-	flag.StringVar(&opts.Proxies, "proxies", "", "")
+	flag.IntVar(&conf.Concurrency, "concurrency", configuration.DefaultConcurrency, "")
+	flag.IntVar(&conf.Concurrency, "c", configuration.DefaultConcurrency, "")
+
+	flag.BoolVar(&conf.Debug, "debug", false, "")
+
+	flag.IntVar(&conf.Depth, "depth", configuration.DefaultDepth, "")
+	flag.IntVar(&conf.Depth, "d", configuration.DefaultDepth, "")
+
+	flag.BoolVar(&conf.Headless, "headless", true, "")
+
+	flag.BoolVar(&conf.IncludeSubdomains, "include-subs", false, "")
+
+	flag.BoolVar(&noColor, "no-color", false, "")
+
+	flag.StringVar(&conf.Proxy, "proxy", "", "")
+	flag.StringVar(&conf.Proxy, "p", "", "")
+
+	flag.IntVar(&conf.MaxRandomDelay, "random-delay", configuration.DefaultMaxRandomDelay, "")
+	flag.IntVar(&conf.MaxRandomDelay, "R", configuration.DefaultMaxRandomDelay, "")
+
+	flag.BoolVar(&conf.Render, "render", false, "")
+	flag.BoolVar(&conf.Render, "r", false, "")
+
+	flag.BoolVar(&silent, "silent", false, "")
+	flag.BoolVar(&silent, "s", false, "")
+
+	flag.IntVar(&conf.Threads, "threads", configuration.DefaultThreads, "")
+
+	flag.IntVar(&conf.Timeout, "timeout", configuration.DefaultTimeout, "")
+
+	flag.StringVar(&URL, "url", "", "")
+	flag.StringVar(&URL, "u", "", "")
+
+	flag.StringVar(&URLsFile, "urls", "", "")
+	flag.StringVar(&URLsFile, "U", "", "")
+
+	flag.StringVar(&conf.UserAgent, "user-agent", "web", "")
 
 	flag.Usage = func() {
-		banner()
+		displayBanner()
 
 		h := "USAGE:\n"
 		h += "  sigrawl3r [OPTIONS]\n"
 
-		h += "\nCRAWLER OPTIONS:\n"
-		h += "  -depth           maximum limit on the recursion depth of visited URLs. (default 1)\n"
-		h += "  -iS              extend scope to include subdomains (default: false)\n"
-		h += "  -proxies         comma separated list of proxies\n"
-		h += "  -random-delay    maximum random delay between requests (default: 2s)\n"
-		h += "  -threads         maximum no. of concurrent requests (default 20)\n"
-		h += "  -timeout         HTTP timeout (default 10s)\n"
-		h += "  -UA              User Agent to use\n"
-
-		h += "\nINPUT OPTIONS:\n"
-		h += "  -iL              urls to crawl (use `iL -` to read from stdin)\n"
-
-		h += "\nOUTPUT OPTIONS:\n"
-		h += "  -debug           stdout: debug mode (default: false)\n"
-		h += "  -nC              stdout: no color mode (default: false)\n"
-		h += "  -oJ              JSON: output file\n"
-		h += "  -silent          stdout: silent mode (default: false)\n"
+		h += "\nOPTIONS:\n"
+		h += fmt.Sprintf("  -c, --concurrency          Maximum concurrent requests for matching domains (default: %d)\n", configuration.DefaultConcurrency)
+		h += "      --debug                Enable debug mode (default: false)\n"
+		h += fmt.Sprintf("  -d, --depth                Maximum recursion depth on visited URLs. (default: %d)\n", configuration.DefaultDepth)
+		h += "      --headless             If true the browser will be displayed while crawling\n"
+		h += "                                 Note: Requires '-r, --render' flag\n"
+		h += "                                 Note: Usage to show browser: '--headless=false' (default true)\n"
+		h += "      --include-subs         Extend scope to include subdomains (default: false)\n"
+		h += "      --no-color             Enable no color mode (default: false)\n"
+		h += "  -p, --proxy                Proxy URL (e.g: http://127.0.0.1:8080)\n"
+		h += "  -R, --random-delay         Maximum random delay between requests (default: 2s)\n"
+		h += "  -r, --render               Render javascript.\n"
+		h += "  -s, --silent               Enable silent mode: output urls only (default: false)\n"
+		h += fmt.Sprintf("  -t, --threads              Number of threads (Run URLs in parallel) (default: %d)\n", configuration.DefaultThreads)
+		h += fmt.Sprintf("      --timeout              Request timeout (second) (default: %d)\n", configuration.DefaultTimeout)
+		h += "  -u, --url                  URL to crawl\n"
+		h += "  -U, --urls                 URLs to crawl\n"
+		h += "      --user-agent           User Agent to use (default: web)\n"
+		h += "                                 `web` for a random web user-agent\n"
+		h += "                                 `mobile` for a random mobile user-agent\n"
+		h += "                                 or you can set your special user-agent\n"
 
 		fmt.Fprint(os.Stderr, h)
 	}
 
 	flag.Parse()
 
-	au = aurora.NewAurora(!co.noColor)
+	au = aurora.NewAurora(!noColor)
 }
 
 func main() {
-	if !co.silent {
-		banner()
+	if !silent {
+		displayBanner()
 	}
 
-	if err := opts.Parse(); err != nil {
+	// validate configuration
+	if err := conf.Validate(); err != nil {
 		log.Fatalln(err)
 	}
 
-	URLs := make(chan string)
+	var (
+		f       *os.File
+		err     error
+		scanner *bufio.Scanner
+	)
 
-	go func() {
-		defer close(URLs)
+	URLs := []string{}
 
-		var scanner *bufio.Scanner
-
-		if co.URLs == "-" {
-			stat, err := os.Stdin.Stat()
-			if err != nil {
-				log.Fatalln(errors.New("no stdin"))
-			}
-
-			if stat.Mode()&os.ModeNamedPipe == 0 {
-				log.Fatalln(errors.New("no stdin"))
-			}
-
-			scanner = bufio.NewScanner(os.Stdin)
-		} else {
-			openedFile, err := os.Open(co.URLs)
-			if err != nil {
-				log.Fatalln(err)
-			}
-			defer openedFile.Close()
-
-			scanner = bufio.NewScanner(openedFile)
-		}
-
-		for scanner.Scan() {
-			if scanner.Text() != "" {
-				URLs <- scanner.Text()
-			}
-		}
-
-		if scanner.Err() != nil {
-			log.Fatalln(scanner.Err())
-		}
-	}()
-
-	var wg sync.WaitGroup
-	var output runner.Results
-
-	for URL := range URLs {
-		wg.Add(1)
-
-		go func(URL string) {
-			defer wg.Done()
-
-			runner, err := runner.New(URL, &opts)
-			if err != nil {
-				log.Fatalln(err)
-			}
-
-			results, err := runner.Run(URL)
-			if err != nil {
-				log.Fatalln(err)
-			}
-
-			output.URLs = append(output.URLs, results.URLs...)
-		}(URL)
+	// input: URL
+	if URL != "" {
+		URLs = append(URLs, URL)
 	}
 
-	wg.Wait()
+	// input: Stdin
+	if io.HasStdIn() {
+		f = os.Stdin
 
-	if co.output != "" {
-		if err := saveResults(co.output, output); err != nil {
+		scanner = bufio.NewScanner(f)
+
+		for scanner.Scan() {
+			URL := scanner.Text()
+
+			if URL != "" {
+				URLs = append(URLs, URL)
+			}
+		}
+
+		if err = scanner.Err(); err != nil {
 			log.Fatalln(err)
 		}
 	}
-}
 
-func saveResults(outputPath string, output runner.Results) error {
-	if _, err := os.Stat(outputPath); os.IsNotExist(err) {
-		directory, filename := path.Split(outputPath)
+	// input: URLs File
+	if URLsFile != "" {
+		f, err = os.Open(URLsFile)
+		if err != nil {
+			log.Fatalln(err)
+		}
 
-		if _, err := os.Stat(directory); os.IsNotExist(err) {
-			if directory != "" {
-				err = os.MkdirAll(directory, os.ModePerm)
-				if err != nil {
-					return err
-				}
+		scanner = bufio.NewScanner(f)
+
+		for scanner.Scan() {
+			URL := scanner.Text()
+
+			if URL != "" {
+				URLs = append(URLs, URL)
 			}
 		}
 
-		if strings.ToLower(path.Ext(filename)) != ".json" {
-			outputPath = outputPath + ".json"
+		if err = scanner.Err(); err != nil {
+			log.Fatalln(err)
 		}
 	}
 
-	outputJSON, err := json.MarshalIndent(output, "", "\t")
-	if err != nil {
-		return err
+	// process URLs
+	inputURLsChan := make(chan string, conf.Threads)
+
+	wg := new(sync.WaitGroup)
+
+	for i := 0; i < conf.Threads; i++ {
+		wg.Add(1)
+
+		go func() {
+			defer wg.Done()
+
+			for URL := range inputURLsChan {
+				parsedURL, err := urlx.Parse(URL)
+				if err != nil {
+					fmt.Fprintln(os.Stderr, err)
+					continue
+				}
+
+				URLwg := new(sync.WaitGroup)
+
+				c, err := crawler.New(parsedURL, &conf)
+				if err != nil {
+					fmt.Fprintln(os.Stderr, err)
+					continue
+				}
+
+				// parse robots.txt
+				URLwg.Add(1)
+				go func() {
+					defer URLwg.Done()
+
+					c.ParseRobots()
+				}()
+
+				// parse sitemaps
+				URLwg.Add(1)
+				go func() {
+					defer URLwg.Done()
+
+					c.ParseSitemap()
+				}()
+
+				// crawl
+				URLwg.Add(1)
+				go func() {
+					defer URLwg.Done()
+
+					c.Run()
+				}()
+
+				URLwg.Wait()
+			}
+		}()
 	}
 
-	outputFile, err := os.Create(outputPath)
-	if err != nil {
-		return err
+	for _, URL := range URLs {
+		inputURLsChan <- URL
 	}
 
-	defer outputFile.Close()
-
-	_, err = outputFile.WriteString(string(outputJSON))
-	if err != nil {
-		return err
-	}
-
-	return nil
+	close(inputURLsChan)
+	wg.Wait()
 }
