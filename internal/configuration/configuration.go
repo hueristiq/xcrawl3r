@@ -27,9 +27,11 @@ var (
 type Configuration struct {
 	AllowedDomains    []string
 	Concurrency       int
+	Cookie            string
 	Debug             bool
 	Delay             int
 	Depth             int
+	Headers           string
 	Headless          bool
 	IncludeSubdomains bool
 	MaxRandomDelay    int // seconds

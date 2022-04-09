@@ -106,6 +106,33 @@ func New(URL *urlx.URL, configuration *configuration.Configuration) (crawler Cra
 
 	crawler.PCollector.SetClient(client)
 
+	// set cookie
+	if crawler.Configuration.Cookie != "" {
+		crawler.PCollector.OnRequest(func(request *colly.Request) {
+			request.Headers.Set("Cookie", crawler.Configuration.Cookie)
+		})
+	}
+
+	// set headers
+	if crawler.Configuration.Headers != "" {
+		crawler.PCollector.OnRequest(func(request *colly.Request) {
+			headers := strings.Split(crawler.Configuration.Headers, ";;")
+			for _, header := range headers {
+				var parts []string
+
+				if strings.Contains(header, ": ") {
+					parts = strings.SplitN(header, ": ", 2)
+				} else if strings.Contains(header, ":") {
+					parts = strings.SplitN(header, ":", 2)
+				} else {
+					continue
+				}
+
+				request.Headers.Set(strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1]))
+			}
+		})
+	}
+
 	// Set User-Agent
 	switch ua := strings.ToLower(crawler.Configuration.UserAgent); {
 	case strings.HasPrefix(ua, "mobi"):
