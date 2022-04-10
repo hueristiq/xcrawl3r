@@ -168,7 +168,7 @@ func New(URL *urlx.URL, configuration *configuration.Configuration) (crawler Cra
 	return crawler, nil
 }
 
-func (crawler *Crawler) Run() (results chan string, err error) {
+func (crawler *Crawler) Crawl() (results chan string, err error) {
 	if crawler.Configuration.Render {
 		// If we're using a proxy send it to the chrome instance
 		browser.GlobalContext, browser.GlobalCancel = browser.GetGlobalContext(crawler.Configuration.Headless, crawler.Configuration.Proxy)

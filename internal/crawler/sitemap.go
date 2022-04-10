@@ -12,12 +12,13 @@ func (crawler *Crawler) ParseSitemap() {
 	for _, path := range sitemapPaths {
 		sitemapURL := fmt.Sprintf("%s://%s%s", crawler.URL.Scheme, crawler.URL.Host, path)
 
-		_ = sitemap.ParseFromSite(sitemapURL, func(entry sitemap.Entry) error {
-			URL := entry.GetLocation()
+		if _, exists := visitedURLs.Load(sitemapURL); !exists {
+			_ = sitemap.ParseFromSite(sitemapURL, func(entry sitemap.Entry) error {
+				crawler.PCollector.Visit(entry.GetLocation())
+				return nil
+			})
+		}
 
-			crawler.PCollector.Visit(URL)
-
-			return nil
-		})
+		visitedURLs.Store(sitemapURL, struct{}{})
 	}
 }

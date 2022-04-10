@@ -17,11 +17,11 @@ import (
 
 var (
 	au       aurora.Aurora
-	conf     configuration.Configuration
+	c        configuration.Configuration
+	noColor  bool
+	silent   bool
 	URL      string
 	URLsFile string
-	silent   bool
-	noColor  bool
 )
 
 func displayBanner() {
@@ -29,32 +29,32 @@ func displayBanner() {
 }
 
 func init() {
-	flag.IntVar(&conf.Concurrency, "concurrency", configuration.DefaultConcurrency, "")
-	flag.IntVar(&conf.Concurrency, "c", configuration.DefaultConcurrency, "")
-	flag.StringVar(&conf.Cookie, "cookie", "", "")
-	flag.BoolVar(&conf.Debug, "debug", false, "")
-	flag.IntVar(&conf.Depth, "depth", configuration.DefaultDepth, "")
-	flag.IntVar(&conf.Depth, "d", configuration.DefaultDepth, "")
-	flag.StringVar(&conf.Headers, "headers", "", "")
-	flag.StringVar(&conf.Headers, "H", "", "")
-	flag.BoolVar(&conf.Headless, "headless", true, "")
-	flag.BoolVar(&conf.IncludeSubdomains, "include-subs", false, "")
+	flag.IntVar(&c.Concurrency, "concurrency", configuration.DefaultConcurrency, "")
+	flag.IntVar(&c.Concurrency, "c", configuration.DefaultConcurrency, "")
+	flag.StringVar(&c.Cookie, "cookie", "", "")
+	flag.BoolVar(&c.Debug, "debug", false, "")
+	flag.IntVar(&c.Depth, "depth", configuration.DefaultDepth, "")
+	flag.IntVar(&c.Depth, "d", configuration.DefaultDepth, "")
+	flag.StringVar(&c.Headers, "headers", "", "")
+	flag.StringVar(&c.Headers, "H", "", "")
+	flag.BoolVar(&c.Headless, "headless", true, "")
+	flag.BoolVar(&c.IncludeSubdomains, "include-subs", false, "")
 	flag.BoolVar(&noColor, "no-color", false, "")
-	flag.StringVar(&conf.Proxy, "proxy", "", "")
-	flag.StringVar(&conf.Proxy, "p", "", "")
-	flag.IntVar(&conf.MaxRandomDelay, "random-delay", configuration.DefaultMaxRandomDelay, "")
-	flag.IntVar(&conf.MaxRandomDelay, "R", configuration.DefaultMaxRandomDelay, "")
-	flag.BoolVar(&conf.Render, "render", false, "")
-	flag.BoolVar(&conf.Render, "r", false, "")
+	flag.StringVar(&c.Proxy, "proxy", "", "")
+	flag.StringVar(&c.Proxy, "p", "", "")
+	flag.IntVar(&c.MaxRandomDelay, "random-delay", configuration.DefaultMaxRandomDelay, "")
+	flag.IntVar(&c.MaxRandomDelay, "R", configuration.DefaultMaxRandomDelay, "")
+	flag.BoolVar(&c.Render, "render", false, "")
+	flag.BoolVar(&c.Render, "r", false, "")
 	flag.BoolVar(&silent, "silent", false, "")
 	flag.BoolVar(&silent, "s", false, "")
-	flag.IntVar(&conf.Threads, "threads", configuration.DefaultThreads, "")
-	flag.IntVar(&conf.Timeout, "timeout", configuration.DefaultTimeout, "")
+	flag.IntVar(&c.Threads, "threads", configuration.DefaultThreads, "")
+	flag.IntVar(&c.Timeout, "timeout", configuration.DefaultTimeout, "")
 	flag.StringVar(&URL, "url", "", "")
 	flag.StringVar(&URL, "u", "", "")
 	flag.StringVar(&URLsFile, "urls", "", "")
 	flag.StringVar(&URLsFile, "U", "", "")
-	flag.StringVar(&conf.UserAgent, "user-agent", "web", "")
+	flag.StringVar(&c.UserAgent, "user-agent", "web", "")
 
 	flag.Usage = func() {
 		displayBanner()
@@ -70,7 +70,8 @@ func init() {
 		h += "      --headless             If true the browser will be displayed while crawling\n"
 		h += "                                 Note: Requires '-r, --render' flag\n"
 		h += "                                 Note: Usage to show browser: '--headless=false' (default true)\n"
-		h += "  -H, --headers              Custom headers separated by two semi-colons. E.g. -h 'Cookie: foo=bar;;Referer: http://example.com/'\n"
+		h += "  -H, --headers              Custom headers separated by two semi-colons.\n"
+		h += "                                 E.g. -h 'Cookie: foo=bar;;Referer: http://example.com/'\n"
 		h += "      --include-subs         Extend scope to include subdomains (default: false)\n"
 		h += "      --no-color             Enable no color mode (default: false)\n"
 		h += "  -p, --proxy                Proxy URL (e.g: http://127.0.0.1:8080)\n"
@@ -100,7 +101,7 @@ func main() {
 	}
 
 	// validate configuration
-	if err := conf.Validate(); err != nil {
+	if err := c.Validate(); err != nil {
 		log.Fatalln(err)
 	}
 
@@ -158,12 +159,10 @@ func main() {
 		}
 	}
 
-	// process URLs
-	inputURLsChan := make(chan string, conf.Threads)
-
 	wg := new(sync.WaitGroup)
+	inputURLsChan := make(chan string, c.Threads)
 
-	for i := 0; i < conf.Threads; i++ {
+	for i := 0; i < c.Threads; i++ {
 		wg.Add(1)
 
 		go func() {
@@ -176,39 +175,39 @@ func main() {
 					continue
 				}
 
-				URLwg := new(sync.WaitGroup)
+				URLswg := new(sync.WaitGroup)
 
-				c, err := crawler.New(parsedURL, &conf)
+				c, err := crawler.New(parsedURL, &c)
 				if err != nil {
 					fmt.Fprintln(os.Stderr, err)
 					continue
 				}
 
-				// parse robots.txt
-				URLwg.Add(1)
+				// crawl
+				URLswg.Add(1)
 				go func() {
-					defer URLwg.Done()
+					defer URLswg.Done()
 
-					c.ParseRobots()
+					c.Crawl()
 				}()
 
 				// parse sitemaps
-				URLwg.Add(1)
+				URLswg.Add(1)
 				go func() {
-					defer URLwg.Done()
+					defer URLswg.Done()
 
 					c.ParseSitemap()
 				}()
 
-				// crawl
-				URLwg.Add(1)
+				// parse robots.txt
+				URLswg.Add(1)
 				go func() {
-					defer URLwg.Done()
+					defer URLswg.Done()
 
-					c.Run()
+					c.ParseRobots()
 				}()
 
-				URLwg.Wait()
+				URLswg.Wait()
 			}
 		}()
 	}
@@ -218,5 +217,6 @@ func main() {
 	}
 
 	close(inputURLsChan)
+
 	wg.Wait()
 }
