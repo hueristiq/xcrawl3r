@@ -211,25 +211,29 @@ func (crawler *Crawler) Crawl() (results chan string, err error) {
 		URL := strings.TrimRight(response.Request.URL.String(), "/")
 
 		if _, exists := foundURLs.Load(URL); !exists {
-			if err := crawler.record(URL); err != nil {
-				return
-			}
-
-			foundURLs.Store(URL, struct{}{})
+			return
 		}
+
+		if err := crawler.record(URL); err != nil {
+			return
+		}
+
+		foundURLs.Store(URL, struct{}{})
 	})
 
 	crawler.PageCollector.OnHTML("*[href]", func(e *colly.HTMLElement) {
 		relativeURL := e.Attr("href")
 		absoluteURL := e.Request.AbsoluteURL(relativeURL)
 
-		if _, exists := foundURLs.Load(absoluteURL); !exists {
-			if err := crawler.record(absoluteURL); err != nil {
-				return
-			}
-
-			foundURLs.Store(absoluteURL, struct{}{})
+		if _, exists := foundURLs.Load(absoluteURL); exists {
+			return
 		}
+
+		if err := crawler.record(absoluteURL); err != nil {
+			return
+		}
+
+		foundURLs.Store(absoluteURL, struct{}{})
 
 		if _, exists := visitedURLs.Load(absoluteURL); !exists {
 			e.Request.Visit(relativeURL)
@@ -240,13 +244,15 @@ func (crawler *Crawler) Crawl() (results chan string, err error) {
 		relativeURL := e.Attr("src")
 		absoluteURL := e.Request.AbsoluteURL(relativeURL)
 
-		if _, exists := foundURLs.Load(absoluteURL); !exists {
-			if err := crawler.record(absoluteURL); err != nil {
-				return
-			}
-
-			foundURLs.Store(absoluteURL, struct{}{})
+		if _, exists := foundURLs.Load(absoluteURL); exists {
+			return
 		}
+
+		if err := crawler.record(absoluteURL); err != nil {
+			return
+		}
+
+		foundURLs.Store(absoluteURL, struct{}{})
 
 		if _, exists := visitedURLs.Load(absoluteURL); !exists {
 			e.Request.Visit(relativeURL)
