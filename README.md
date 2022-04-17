@@ -24,9 +24,11 @@ A fast web crawler.
 
 ## Usage
 
-```text
-$ sigrawl3r -h
+```bash
+sigrawl3r -h
+```
 
+```text
      _                          _ _____      
  ___(_) __ _ _ __ __ ___      _| |___ / _ __ 
 / __| |/ _` | '__/ _` \ \ /\ / / | |_ \| '__|

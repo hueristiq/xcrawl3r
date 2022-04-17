@@ -21,12 +21,12 @@ import (
 )
 
 type Crawler struct {
-	URL                      *urlx.URL
-	Configuration            *configuration.Configuration
-	PCollector               *colly.Collector
-	LinkFinderCollector      *colly.Collector
-	DocumentsToLinkFindRegex *regexp.Regexp
-	IgnoreRegex              *regexp.Regexp
+	URL                   *urlx.URL
+	Configuration         *configuration.Configuration
+	PageCollector         *colly.Collector
+	LinkFindCollector     *colly.Collector
+	URLsToLinkFindRegex   *regexp.Regexp
+	URLsNotToRequestRegex *regexp.Regexp
 }
 
 var foundURLs sync.Map
@@ -42,7 +42,7 @@ func New(URL *urlx.URL, configuration *configuration.Configuration) (crawler Cra
 
 	configuration.AllowedDomains = append(configuration.AllowedDomains, []string{crawler.URL.Domain, "www." + crawler.URL.Domain}...)
 
-	crawler.PCollector = colly.NewCollector(
+	crawler.PageCollector = colly.NewCollector(
 		colly.IgnoreRobotsTxt(),
 		// limit crawling to the domain of the specified URL
 		colly.AllowedDomains(configuration.AllowedDomains...),
@@ -54,15 +54,15 @@ func New(URL *urlx.URL, configuration *configuration.Configuration) (crawler Cra
 
 	// if -subs is present, use regex to filter out subdomains in scope.
 	if crawler.Configuration.IncludeSubdomains {
-		crawler.PCollector.AllowedDomains = nil
-		crawler.PCollector.URLFilters = []*regexp.Regexp{
+		crawler.PageCollector.AllowedDomains = nil
+		crawler.PageCollector.URLFilters = []*regexp.Regexp{
 			regexp.MustCompile(".*(\\.|\\/\\/)" + strings.ReplaceAll(crawler.URL.Domain, ".", "\\.") + "((#|\\/|\\?).*)?"),
 		}
 	}
 
 	// Debug
 	if crawler.Configuration.Debug {
-		crawler.PCollector.SetDebugger(&debug.LogDebugger{})
+		crawler.PageCollector.SetDebugger(&debug.LogDebugger{})
 	}
 
 	// Setup the client with our transport to pass to the collectors
@@ -104,18 +104,18 @@ func New(URL *urlx.URL, configuration *configuration.Configuration) (crawler Cra
 		},
 	}
 
-	crawler.PCollector.SetClient(client)
+	crawler.PageCollector.SetClient(client)
 
 	// set cookie
 	if crawler.Configuration.Cookie != "" {
-		crawler.PCollector.OnRequest(func(request *colly.Request) {
+		crawler.PageCollector.OnRequest(func(request *colly.Request) {
 			request.Headers.Set("Cookie", crawler.Configuration.Cookie)
 		})
 	}
 
 	// set headers
 	if crawler.Configuration.Headers != "" {
-		crawler.PCollector.OnRequest(func(request *colly.Request) {
+		crawler.PageCollector.OnRequest(func(request *colly.Request) {
 			headers := strings.Split(crawler.Configuration.Headers, ";;")
 			for _, header := range headers {
 				var parts []string
@@ -136,18 +136,18 @@ func New(URL *urlx.URL, configuration *configuration.Configuration) (crawler Cra
 	// Set User-Agent
 	switch ua := strings.ToLower(crawler.Configuration.UserAgent); {
 	case strings.HasPrefix(ua, "mobi"):
-		extensions.RandomMobileUserAgent(crawler.PCollector)
+		extensions.RandomMobileUserAgent(crawler.PageCollector)
 	case strings.HasPrefix(ua, "web"):
-		extensions.RandomUserAgent(crawler.PCollector)
+		extensions.RandomUserAgent(crawler.PageCollector)
 	default:
-		crawler.PCollector.UserAgent = ua
+		crawler.PageCollector.UserAgent = ua
 	}
 
 	// Referer
-	extensions.Referer(crawler.PCollector)
+	extensions.Referer(crawler.PageCollector)
 
 	// Set parallelism
-	if err = crawler.PCollector.Limit(&colly.LimitRule{
+	if err = crawler.PageCollector.Limit(&colly.LimitRule{
 		DomainGlob:  "*",
 		Parallelism: crawler.Configuration.Concurrency,
 		Delay:       time.Duration(crawler.Configuration.Delay) * time.Second,
@@ -156,14 +156,14 @@ func New(URL *urlx.URL, configuration *configuration.Configuration) (crawler Cra
 		return
 	}
 
-	crawler.LinkFinderCollector = crawler.PCollector.Clone()
-	crawler.LinkFinderCollector.URLFilters = nil
+	crawler.LinkFindCollector = crawler.PageCollector.Clone()
+	crawler.LinkFindCollector.URLFilters = nil
 
-	crawler.PCollector.ID = 1
-	crawler.LinkFinderCollector.ID = 2
+	crawler.PageCollector.ID = 1
+	crawler.LinkFindCollector.ID = 2
 
-	crawler.DocumentsToLinkFindRegex = regexp.MustCompile(`(?m).*?\.*(js|json|xml|csv|txt|map)(\?.*?|)$`)
-	crawler.IgnoreRegex = regexp.MustCompile(`(?i)\.(apng|bpm|png|bmp|gif|heif|ico|cur|jpg|jpeg|jfif|pjp|pjpeg|psd|raw|svg|tif|tiff|webp|xbm|3gp|aac|flac|mpg|mpeg|mp3|mp4|m4a|m4v|m4p|oga|ogg|ogv|mov|wav|webm|eot|woff|woff2|ttf|otf|css)(?:\?|#|$)`)
+	crawler.URLsToLinkFindRegex = regexp.MustCompile(`(?m).*?\.*(js|json|xml|csv|txt|map)(\?.*?|)$`)
+	crawler.URLsNotToRequestRegex = regexp.MustCompile(`(?i)\.(apng|bpm|png|bmp|gif|heif|ico|cur|jpg|jpeg|jfif|pjp|pjpeg|psd|raw|svg|tif|tiff|webp|xbm|3gp|aac|flac|mpg|mpeg|mp3|mp4|m4a|m4v|m4p|oga|ogg|ogv|mov|wav|webm|eot|woff|woff2|ttf|otf|css)(?:\?|#|$)`)
 
 	return crawler, nil
 }
@@ -177,13 +177,13 @@ func (crawler *Crawler) Crawl() (results chan string, err error) {
 		defer browser.GlobalCancel()
 
 		// If renderJavascript, pass the response's body to the renderer and then replace the body for .OnHTML to handle.
-		crawler.PCollector.OnResponse(func(request *colly.Response) {
+		crawler.PageCollector.OnResponse(func(request *colly.Response) {
 			html := browser.GetRenderedSource(request.Request.URL.String())
 			request.Body = []byte(html)
 		})
 	}
 
-	crawler.PCollector.OnRequest(func(request *colly.Request) {
+	crawler.PageCollector.OnRequest(func(request *colly.Request) {
 		URL := strings.TrimRight(request.URL.String(), "/")
 
 		if _, exists := visitedURLs.Load(URL); exists {
@@ -191,13 +191,13 @@ func (crawler *Crawler) Crawl() (results chan string, err error) {
 			return
 		}
 
-		if match := crawler.IgnoreRegex.MatchString(URL); match {
+		if match := crawler.URLsNotToRequestRegex.MatchString(URL); match {
 			request.Abort()
 			return
 		}
 
-		if match := crawler.DocumentsToLinkFindRegex.MatchString(URL); match {
-			crawler.LinkFinderCollector.Visit(URL)
+		if match := crawler.URLsToLinkFindRegex.MatchString(URL); match {
+			crawler.LinkFindCollector.Visit(URL)
 			request.Abort()
 			return
 		}
@@ -207,7 +207,7 @@ func (crawler *Crawler) Crawl() (results chan string, err error) {
 		return
 	})
 
-	crawler.LinkFinderCollector.OnResponse(func(response *colly.Response) {
+	crawler.LinkFindCollector.OnResponse(func(response *colly.Response) {
 		URL := strings.TrimRight(response.Request.URL.String(), "/")
 
 		if _, exists := foundURLs.Load(URL); !exists {
@@ -219,7 +219,7 @@ func (crawler *Crawler) Crawl() (results chan string, err error) {
 		}
 	})
 
-	crawler.PCollector.OnHTML("*[href]", func(e *colly.HTMLElement) {
+	crawler.PageCollector.OnHTML("*[href]", func(e *colly.HTMLElement) {
 		relativeURL := e.Attr("href")
 		absoluteURL := e.Request.AbsoluteURL(relativeURL)
 
@@ -236,7 +236,7 @@ func (crawler *Crawler) Crawl() (results chan string, err error) {
 		}
 	})
 
-	crawler.PCollector.OnHTML("script[src]", func(e *colly.HTMLElement) {
+	crawler.PageCollector.OnHTML("script[src]", func(e *colly.HTMLElement) {
 		relativeURL := e.Attr("src")
 		absoluteURL := e.Request.AbsoluteURL(relativeURL)
 
@@ -253,7 +253,7 @@ func (crawler *Crawler) Crawl() (results chan string, err error) {
 		}
 	})
 
-	crawler.LinkFinderCollector.OnRequest(func(request *colly.Request) {
+	crawler.LinkFindCollector.OnRequest(func(request *colly.Request) {
 		URL := request.URL.String()
 
 		if _, exists := visitedURLs.Load(URL); exists {
@@ -266,7 +266,7 @@ func (crawler *Crawler) Crawl() (results chan string, err error) {
 			js := strings.ReplaceAll(URL, ".min.js", ".js")
 
 			if _, exists := visitedURLs.Load(js); !exists {
-				crawler.LinkFinderCollector.Visit(js)
+				crawler.LinkFindCollector.Visit(js)
 				visitedURLs.Store(js, struct{}{})
 			}
 		}
@@ -274,7 +274,7 @@ func (crawler *Crawler) Crawl() (results chan string, err error) {
 		visitedURLs.Store(URL, struct{}{})
 	})
 
-	crawler.LinkFinderCollector.OnResponse(func(response *colly.Response) {
+	crawler.LinkFindCollector.OnResponse(func(response *colly.Response) {
 		links, err := crawler.FindLinks(string(response.Body))
 		if err != nil {
 			return
@@ -317,16 +317,16 @@ func (crawler *Crawler) Crawl() (results chan string, err error) {
 			}
 
 			if _, exists := visitedURLs.Load(URL); !exists {
-				crawler.PCollector.Visit(URL)
+				crawler.PageCollector.Visit(URL)
 			}
 		}
 	})
 
-	crawler.PCollector.Visit(crawler.URL.String())
+	crawler.PageCollector.Visit(crawler.URL.String())
 
 	// Async means we must .Wait() on each Collector
-	crawler.PCollector.Wait()
-	crawler.LinkFinderCollector.Wait()
+	crawler.PageCollector.Wait()
+	crawler.LinkFindCollector.Wait()
 
 	return
 }
