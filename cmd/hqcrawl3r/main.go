@@ -9,10 +9,10 @@ import (
 	"sync"
 
 	"github.com/enenumxela/urlx/pkg/urlx"
+	"github.com/hueristiq/hqcrawl3r/internal/configuration"
+	"github.com/hueristiq/hqcrawl3r/internal/crawler"
+	"github.com/hueristiq/hqcrawl3r/internal/utils/io"
 	"github.com/logrusorgru/aurora/v3"
-	"github.com/signedsecurity/sigrawl3r/internal/configuration"
-	"github.com/signedsecurity/sigrawl3r/internal/crawler"
-	"github.com/signedsecurity/sigrawl3r/internal/utils/io"
 )
 
 var (
@@ -60,7 +60,7 @@ func init() {
 		displayBanner()
 
 		h := "USAGE:\n"
-		h += "  sigrawl3r [OPTIONS]\n"
+		h += "  hqcrawl3r [OPTIONS]\n"
 
 		h += "\nOPTIONS:\n"
 		h += fmt.Sprintf("  -c, --concurrency          Maximum concurrent requests for matching domains (default: %d)\n", configuration.DefaultConcurrency)
@@ -86,6 +86,7 @@ func init() {
 		h += "                                 `web` for a random web user-agent\n"
 		h += "                                 `mobile` for a random mobile user-agent\n"
 		h += "                                 or you can set your special user-agent\n"
+		h += "\n"
 
 		fmt.Fprint(os.Stderr, h)
 	}

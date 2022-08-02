@@ -1,7 +1,7 @@
 builds:
     -
-        binary: sigrawl3r
-        main: cmd/sigrawl3r/main.go
+        binary: hqcrawl3r
+        main: cmd/hqcrawl3r/main.go
         goos:
             - linux
             - windows

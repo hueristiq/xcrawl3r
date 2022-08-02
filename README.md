@@ -1,6 +1,6 @@
-# sigrawl3r
+# hqcrawl3r
 
-[![release](https://img.shields.io/github/release/signedsecurity/sigrawl3r?style=flat&color=0040ff)](https://github.com/signedsecurity/sigrawl3r/releases) [![maintenance](https://img.shields.io/badge/maintained%3F-yes-0040ff.svg)](https://github.com/signedsecurity/sigrawl3r) [![open issues](https://img.shields.io/github/issues-raw/signedsecurity/sigrawl3r.svg?style=flat&color=0040ff)](https://github.com/signedsecurity/sigrawl3r/issues?q=is:issue+is:open) [![closed issues](https://img.shields.io/github/issues-closed-raw/signedsecurity/sigrawl3r.svg?style=flat&color=0040ff)](https://github.com/signedsecurity/sigrawl3r/issues?q=is:issue+is:closed) [![license](https://img.shields.io/badge/license-MIT-gray.svg?colorB=0040FF)](https://github.com/signedsecurity/sigrawl3r/blob/master/LICENSE) [![twitter](https://img.shields.io/badge/twitter-@signedsecurity-0040ff.svg)](https://twitter.com/signedsecurity)
+[![release](https://img.shields.io/github/release/hueristiq/hqcrawl3r?style=flat&color=0040ff)](https://github.com/hueristiq/hqcrawl3r/releases) [![maintenance](https://img.shields.io/badge/maintained%3F-yes-0040ff.svg)](https://github.com/hueristiq/hqcrawl3r) [![open issues](https://img.shields.io/github/issues-raw/hueristiq/hqcrawl3r.svg?style=flat&color=0040ff)](https://github.com/hueristiq/hqcrawl3r/issues?q=is:issue+is:open) [![closed issues](https://img.shields.io/github/issues-closed-raw/hueristiq/hqcrawl3r.svg?style=flat&color=0040ff)](https://github.com/hueristiq/hqcrawl3r/issues?q=is:issue+is:closed) [![license](https://img.shields.io/badge/license-MIT-gray.svg?colorB=0040FF)](https://github.com/hueristiq/hqcrawl3r/blob/master/LICENSE) [![twitter](https://img.shields.io/badge/twitter-@itshueristiq-0040ff.svg)](https://twitter.com/itshueristiq)
 
 A fast web crawler.
 
@@ -25,19 +25,19 @@ A fast web crawler.
 ## Usage
 
 ```bash
-sigrawl3r -h
+hqcrawl3r -h
 ```
 
 ```text
-     _                          _ _____      
- ___(_) __ _ _ __ __ ___      _| |___ / _ __ 
-/ __| |/ _` | '__/ _` \ \ /\ / / | |_ \| '__|
-\__ \ | (_| | | | (_| |\ V  V /| |___) | |   
-|___/_|\__, |_|  \__,_| \_/\_/ |_|____/|_| v1.1.0
-       |___/
+ _                                   _ _____      
+| |__   __ _  ___ _ __ __ ___      _| |___ / _ __ 
+| '_ \ / _` |/ __| '__/ _` \ \ /\ / / | |_ \| '__|
+| | | | (_| | (__| | | (_| |\ V  V /| |___) | |   
+|_| |_|\__, |\___|_|  \__,_| \_/\_/ |_|____/|_| v1.1.0
+          |_|
 
 USAGE:
-  sigrawl3r [OPTIONS]
+  hqcrawl3r [OPTIONS]
 
 OPTIONS:
   -c, --concurrency          Maximum concurrent requests for matching domains (default: 5)
@@ -47,7 +47,8 @@ OPTIONS:
       --headless             If true the browser will be displayed while crawling
                                  Note: Requires '-r, --render' flag
                                  Note: Usage to show browser: '--headless=false' (default true)
-  -H, --headers              Custom headers separated by two semi-colons. E.g. -h 'Cookie: foo=bar;;Referer: http://example.com/'
+  -H, --headers              Custom headers separated by two semi-colons.
+                                 E.g. -h 'Cookie: foo=bar;;Referer: http://example.com/'
       --include-subs         Extend scope to include subdomains (default: false)
       --no-color             Enable no color mode (default: false)
   -p, --proxy                Proxy URL (e.g: http://127.0.0.1:8080)
@@ -68,26 +69,26 @@ OPTIONS:
 
 #### From Binary
 
-You can download the pre-built binary for your platform from this repository's [releases](https://github.com/signedsecurity/sigrawl3r/releases/) page, extract, then move it to your `$PATH`and you're ready to go.
+You can download the pre-built binary for your platform from this repository's [releases](https://github.com/hueristiq/hqcrawl3r/releases/) page, extract, then move it to your `$PATH`and you're ready to go.
 
 #### From Source
 
-sigrawl3r requires **go1.17+** to install successfully. Run the following command to get the repo
+hqcrawl3r requires **go1.17+** to install successfully. Run the following command to get the repo
 
 ```bash
-go install github.com/signedsecurity/sigrawl3r/cmd/sigrawl3r@latest
+go install github.com/hueristiq/hqcrawl3r/cmd/hqcrawl3r@latest
 ```
 
 #### From Github
 
 ```bash
-git clone https://github.com/signedsecurity/sigrawl3r.git && \
-cd sigrawl3r/cmd/sigrawl3r/ && \
+git clone https://github.com/hueristiq/hqcrawl3r.git && \
+cd hqcrawl3r/cmd/hqcrawl3r/ && \
 go build . && \
-mv sigrawl3r /usr/local/bin/ && \
-sigrawl3r -h
+mv hqcrawl3r /usr/local/bin/ && \
+hqcrawl3r -h
 ```
 
 ## Contribution
 
-[Issues](https://github.com/signedsecurity/sigrawl3r/issues) and [Pull Requests](https://github.com/signedsecurity/sigrawl3r/pulls) are welcome! 
+[Issues](https://github.com/hueristiq/hqcrawl3r/issues) and [Pull Requests](https://github.com/hueristiq/hqcrawl3r/pulls) are welcome! 

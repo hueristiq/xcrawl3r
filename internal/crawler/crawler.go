@@ -16,8 +16,8 @@ import (
 	"github.com/gocolly/colly/v2"
 	"github.com/gocolly/colly/v2/debug"
 	"github.com/gocolly/colly/v2/extensions"
-	"github.com/signedsecurity/sigrawl3r/internal/browser"
-	"github.com/signedsecurity/sigrawl3r/internal/configuration"
+	"github.com/hueristiq/hqcrawl3r/internal/browser"
+	"github.com/hueristiq/hqcrawl3r/internal/configuration"
 )
 
 type Crawler struct {

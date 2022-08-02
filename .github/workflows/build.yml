@@ -1,4 +1,4 @@
-name: build
+name: build 🔨
 
 on:
     push:
@@ -12,16 +12,16 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             -
-                name: Set up Go
-                uses: actions/setup-go@v2
-                with:
-                        go-version: 1.17
-
-            -
                 name: Check out code
-                uses: actions/checkout@v2
-
+                uses: actions/checkout@v3
+                with:
+                    fetch-depth: 0
+            -
+                name: Set up Go
+                uses: actions/setup-go@v3
+                with:
+                    go-version: '>=1.17.0'
             -
                 name: Build
                 run: go build -v .
-                working-directory: cmd/sigrawl3r/
+                working-directory: ./cmd/hqcrawl3r
