@@ -12,12 +12,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/enenumxela/urlx/pkg/urlx"
 	"github.com/gocolly/colly/v2"
 	"github.com/gocolly/colly/v2/debug"
 	"github.com/gocolly/colly/v2/extensions"
 	"github.com/hueristiq/hqcrawl3r/internal/browser"
 	"github.com/hueristiq/hqcrawl3r/internal/configuration"
+	"github.com/hueristiq/urlx/pkg/urlx"
 )
 
 type Crawler struct {

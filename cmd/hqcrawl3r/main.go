@@ -8,10 +8,10 @@ import (
 	"os"
 	"sync"
 
-	"github.com/enenumxela/urlx/pkg/urlx"
 	"github.com/hueristiq/hqcrawl3r/internal/configuration"
 	"github.com/hueristiq/hqcrawl3r/internal/crawler"
 	"github.com/hueristiq/hqcrawl3r/internal/utils/io"
+	"github.com/hueristiq/urlx/pkg/urlx"
 	"github.com/logrusorgru/aurora/v3"
 )
 

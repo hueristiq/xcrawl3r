@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/enenumxela/urlx/pkg/urlx"
+	"github.com/hueristiq/urlx/pkg/urlx"
 )
 
 func (crawler *Crawler) fixURL(URL string) (fixedURL string) {
