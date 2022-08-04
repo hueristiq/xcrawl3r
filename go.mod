@@ -5,7 +5,7 @@ go 1.18
 require (
 	github.com/chromedp/chromedp v0.8.3
 	github.com/gocolly/colly/v2 v2.1.0
-	github.com/hueristiq/urlx v0.0.0-20220803194609-1f2760fedf40
+	github.com/hueristiq/url v0.0.0-20220804093805-5ca3562ceccd
 	github.com/logrusorgru/aurora/v3 v3.0.0
 	github.com/oxffaa/gopher-parse-sitemap v0.0.0-20191021113419-005d2eb1def4
 )

@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/hueristiq/urlx/pkg/urlx"
+	"github.com/hueristiq/url"
 )
 
 func (crawler *Crawler) fixURL(URL string) (fixedURL string) {
@@ -56,7 +56,7 @@ func decode(URL string) string {
 func (crawler *Crawler) record(URL string) (err error) {
 	URL = decode(URL)
 
-	parsedURL, err := urlx.Parse(URL)
+	parsedURL, err := url.Parse(url.Options{URL: URL})
 	if err != nil {
 		return
 	}

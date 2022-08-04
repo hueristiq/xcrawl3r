@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"net/url"
+	urlz "net/url"
 	"os"
 	"regexp"
 	"strings"
@@ -17,11 +17,11 @@ import (
 	"github.com/gocolly/colly/v2/extensions"
 	"github.com/hueristiq/hqcrawl3r/internal/browser"
 	"github.com/hueristiq/hqcrawl3r/internal/configuration"
-	"github.com/hueristiq/urlx/pkg/urlx"
+	"github.com/hueristiq/url"
 )
 
 type Crawler struct {
-	URL                   *urlx.URL
+	URL                   *url.URL
 	Configuration         *configuration.Configuration
 	PageCollector         *colly.Collector
 	LinkFindCollector     *colly.Collector
@@ -32,7 +32,7 @@ type Crawler struct {
 var foundURLs sync.Map
 var visitedURLs sync.Map
 
-func New(URL *urlx.URL, configuration *configuration.Configuration) (crawler Crawler, err error) {
+func New(URL *url.URL, configuration *configuration.Configuration) (crawler Crawler, err error) {
 	crawler.URL = URL
 	crawler.Configuration = configuration
 
@@ -82,7 +82,7 @@ func New(URL *urlx.URL, configuration *configuration.Configuration) (crawler Cra
 	}
 
 	if crawler.Configuration.Proxy != "" {
-		pU, err := url.Parse(crawler.Configuration.Proxy)
+		pU, err := urlz.Parse(crawler.Configuration.Proxy)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 		} else {

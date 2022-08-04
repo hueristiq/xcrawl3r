@@ -11,7 +11,7 @@ import (
 	"github.com/hueristiq/hqcrawl3r/internal/configuration"
 	"github.com/hueristiq/hqcrawl3r/internal/crawler"
 	"github.com/hueristiq/hqcrawl3r/internal/utils/io"
-	"github.com/hueristiq/urlx/pkg/urlx"
+	"github.com/hueristiq/url"
 	"github.com/logrusorgru/aurora/v3"
 )
 
@@ -170,7 +170,7 @@ func main() {
 			defer wg.Done()
 
 			for URL := range inputURLsChan {
-				parsedURL, err := urlx.Parse(URL)
+				parsedURL, err := url.Parse(url.Options{URL: URL})
 				if err != nil {
 					fmt.Fprintln(os.Stderr, err)
 					continue

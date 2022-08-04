@@ -10,7 +10,7 @@ const (
 	DefaultThreads        = 20
 	DefaultMaxRandomDelay = 60
 	DefaultTimeout        = 10
-	VERSION               = "v1.2.0"
+	VERSION               = "v1.3.0"
 )
 
 var (
