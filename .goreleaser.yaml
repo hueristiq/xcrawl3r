@@ -1,11 +1,18 @@
+before:
+    hooks:
+        - go mod tidy
+
 builds:
     -
-        binary: hqcrawl3r
+        id: hqcrawl3r
         main: cmd/hqcrawl3r/main.go
+        env:
+            - CGO_ENABLED=0
+        binary: hqcrawl3r
         goos:
             - linux
-            - windows
             - darwin
+            - windows
         goarch:
             - amd64
             - 386

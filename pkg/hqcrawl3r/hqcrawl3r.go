@@ -1,4 +1,4 @@
-package crawler
+package hqcrawl3r
 
 import (
 	"crypto/tls"
@@ -15,37 +15,56 @@ import (
 	"github.com/gocolly/colly/v2"
 	"github.com/gocolly/colly/v2/debug"
 	"github.com/gocolly/colly/v2/extensions"
-	"github.com/hueristiq/hqcrawl3r/internal/browser"
-	"github.com/hueristiq/hqcrawl3r/internal/configuration"
-	"github.com/hueristiq/url"
+	"github.com/hueristiq/hqcrawl3r/pkg/hqcrawl3r/browser"
+	hqurl "github.com/hueristiq/hqgoutils/url"
 )
 
 type Crawler struct {
-	URL                   *url.URL
-	Configuration         *configuration.Configuration
+	URL                   *hqurl.URL
+	Configuration         *Options
 	PageCollector         *colly.Collector
 	LinkFindCollector     *colly.Collector
 	URLsToLinkFindRegex   *regexp.Regexp
 	URLsNotToRequestRegex *regexp.Regexp
 }
 
+type Options struct {
+	TargetURL         *hqurl.URL
+	AllowedDomains    []string
+	Concurrency       int
+	Cookie            string
+	Debug             bool
+	Delay             int
+	Depth             int
+	Headers           string
+	Headless          bool
+	IncludeSubdomains bool
+	MaxRandomDelay    int // seconds
+	Proxy             string
+	Render            bool
+	RenderTimeout     int // seconds
+	Threads           int
+	Timeout           int // seconds
+	UserAgent         string
+}
+
 var foundURLs sync.Map
 var visitedURLs sync.Map
 
-func New(URL *url.URL, configuration *configuration.Configuration) (crawler Crawler, err error) {
-	crawler.URL = URL
-	crawler.Configuration = configuration
+func New(options *Options) (crawler Crawler, err error) {
+	crawler.URL = options.TargetURL
+	crawler.Configuration = options
 
-	if configuration.AllowedDomains == nil {
-		configuration.AllowedDomains = []string{}
+	if options.AllowedDomains == nil {
+		options.AllowedDomains = []string{}
 	}
 
-	configuration.AllowedDomains = append(configuration.AllowedDomains, []string{crawler.URL.Domain, "www." + crawler.URL.Domain}...)
+	options.AllowedDomains = append(options.AllowedDomains, []string{crawler.URL.Domain, "www." + crawler.URL.Domain}...)
 
 	crawler.PageCollector = colly.NewCollector(
 		colly.IgnoreRobotsTxt(),
 		// limit crawling to the domain of the specified URL
-		colly.AllowedDomains(configuration.AllowedDomains...),
+		colly.AllowedDomains(options.AllowedDomains...),
 		// set MaxDepth to the specified depth
 		colly.MaxDepth(crawler.Configuration.Depth),
 		// specify Async for threading

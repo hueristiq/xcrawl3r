@@ -1,4 +1,4 @@
-package crawler
+package hqcrawl3r
 
 import (
 	"fmt"

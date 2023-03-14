@@ -5,60 +5,22 @@ import (
 )
 
 const (
-	DefaultConcurrency    = 5
-	DefaultDepth          = 1
-	DefaultThreads        = 20
-	DefaultMaxRandomDelay = 60
-	DefaultTimeout        = 10
-	VERSION               = "v1.3.0"
+	VERSION     = "v0.0.0"
+	DESCRIPTION = "A CLI utility to recursively crawl webpages."
 )
 
 var (
 	BANNER string = aurora.Sprintf(aurora.BrightBlue(`
- _                                   _ _____      
-| |__   __ _  ___ _ __ __ ___      _| |___ / _ __ 
+ _                                   _ _____
+| |__   __ _  ___ _ __ __ ___      _| |___ / _ __
 | '_ \ / _`+"`"+` |/ __| '__/ _`+"`"+` \ \ /\ / / | |_ \| '__|
-| | | | (_| | (__| | | (_| |\ V  V /| |___) | |   
-|_| |_|\__, |\___|_|  \__,_| \_/\_/ |_|____/|_| %s
-          |_|
-`).Bold(), aurora.BrightRed(VERSION).Bold())
+| | | | (_| | (__| | | (_| |\ V  V /| |___) | |
+|_| |_|\__, |\___|_|  \__,_| \_/\_/ |_|____/|_|
+          |_|                            %s
+
+[> %s <]
+`).Bold(),
+		aurora.BrightYellow(VERSION).Bold(),
+		aurora.BrightGreen(DESCRIPTION).Bold(),
+	)
 )
-
-type Configuration struct {
-	AllowedDomains    []string
-	Concurrency       int
-	Cookie            string
-	Debug             bool
-	Delay             int
-	Depth             int
-	Headers           string
-	Headless          bool
-	IncludeSubdomains bool
-	MaxRandomDelay    int // seconds
-	Proxy             string
-	Render            bool
-	RenderTimeout     int // seconds
-	Threads           int
-	Timeout           int // seconds
-	UserAgent         string
-}
-
-func (configuration *Configuration) Validate() (err error) {
-	if configuration.Concurrency <= 0 {
-		configuration.Concurrency = DefaultConcurrency
-	}
-
-	if configuration.Depth <= 0 {
-		configuration.Depth = DefaultDepth
-	}
-
-	if configuration.Threads <= 0 {
-		configuration.Threads = DefaultThreads
-	}
-
-	if configuration.Timeout <= 0 {
-		configuration.Timeout = DefaultTimeout
-	}
-
-	return
-}

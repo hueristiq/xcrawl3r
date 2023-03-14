@@ -1,4 +1,4 @@
-package crawler
+package hqcrawl3r
 
 import (
 	"fmt"
@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/hueristiq/url"
+	hqurl "github.com/hueristiq/hqgoutils/url"
 )
 
 func (crawler *Crawler) fixURL(URL string) (fixedURL string) {
@@ -56,7 +56,7 @@ func decode(URL string) string {
 func (crawler *Crawler) record(URL string) (err error) {
 	URL = decode(URL)
 
-	parsedURL, err := url.Parse(url.Options{URL: URL})
+	parsedURL, err := hqurl.Parse(URL)
 	if err != nil {
 		return
 	}

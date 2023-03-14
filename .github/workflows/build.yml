@@ -1,27 +1,34 @@
-name: build 🔨
+name: 🔨 build
 
 on:
     push:
-        branches:
-            - main
     workflow_dispatch:
 
 jobs:
     build:
-        name: build
-        runs-on: ubuntu-latest
+        name: Build
+        strategy:
+            matrix:
+                os: [ubuntu-latest, windows-latest, macOS-12]
+        runs-on: ${{ matrix.os }}
         steps:
-            -
-                name: Check out code
-                uses: actions/checkout@v3
-                with:
-                    fetch-depth: 0
             -
                 name: Set up Go
                 uses: actions/setup-go@v3
                 with:
-                    go-version: '>=1.17.0'
+                    go-version:  '>=1.20'
             -
-                name: Build
+                name: Checkout the code
+                uses: actions/checkout@v3
+                with:
+                    fetch-depth: 0
+            - 
+                name: Go modules hygine
+                run: |
+                    go clean -modcache
+                    go mod tidy
+                working-directory: .
+            -
+                name: Go build
                 run: go build -v .
-                working-directory: ./cmd/hqcrawl3r
+                working-directory: cmd/hqcrawl3r/
