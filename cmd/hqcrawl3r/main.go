@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"flag"
 	"fmt"
 	"os"
 	"sync"
@@ -59,7 +58,8 @@ func init() {
 	pflag.BoolVarP(&monochrome, "monochrome", "m", false, "")
 	pflag.StringVarP(&verbosity, "verbosity", "v", string(levels.LevelInfo), "")
 
-	flag.Usage = func() {
+	pflag.CommandLine.SortFlags = false
+	pflag.Usage = func() {
 		displayBanner()
 
 		h := "USAGE:\n"
