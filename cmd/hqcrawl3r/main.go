@@ -35,10 +35,6 @@ var (
 	verbosity             string
 )
 
-func displayBanner() {
-	fmt.Fprintln(os.Stderr, configuration.BANNER)
-}
-
 func init() {
 	pflag.IntVarP(&concurrency, "concurrency", "c", 5, "")
 	pflag.StringVar(&cookies, "cookie", "", "")
@@ -60,9 +56,9 @@ func init() {
 
 	pflag.CommandLine.SortFlags = false
 	pflag.Usage = func() {
-		displayBanner()
+		h := configuration.BANNER
 
-		h := "USAGE:\n"
+		h += "\nUSAGE:\n"
 		h += "  hqcrawl3r [OPTIONS]\n"
 
 		h += "\nOPTIONS:\n"
@@ -102,13 +98,13 @@ func init() {
 }
 
 func main() {
-	displayBanner()
-
 	var (
 		f       *os.File
 		err     error
 		scanner *bufio.Scanner
 	)
+
+	fmt.Fprintln(os.Stderr, configuration.BANNER)
 
 	URLs := []string{}
 
