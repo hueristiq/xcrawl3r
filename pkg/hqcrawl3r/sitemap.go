@@ -7,7 +7,20 @@ import (
 )
 
 func (crawler *Crawler) ParseSitemap() {
-	sitemapPaths := []string{"/sitemap.xml", "/sitemap_news.xml", "/sitemap_index.xml", "/sitemap-index.xml", "/sitemapindex.xml", "/sitemap-news.xml", "/post-sitemap.xml", "/page-sitemap.xml", "/portfolio-sitemap.xml", "/home_slider-sitemap.xml", "/category-sitemap.xml", "/author-sitemap.xml"}
+	sitemapPaths := []string{
+		"/sitemap.xml",
+		"/sitemap_news.xml",
+		"/sitemap_index.xml",
+		"/sitemap-index.xml",
+		"/sitemapindex.xml",
+		"/sitemap-news.xml",
+		"/post-sitemap.xml",
+		"/page-sitemap.xml",
+		"/portfolio-sitemap.xml",
+		"/home_slider-sitemap.xml",
+		"/category-sitemap.xml",
+		"/author-sitemap.xml",
+	}
 
 	for _, path := range sitemapPaths {
 		sitemapURL := fmt.Sprintf("%s://%s%s", crawler.URL.Scheme, crawler.URL.Host, path)
@@ -17,7 +30,10 @@ func (crawler *Crawler) ParseSitemap() {
 		}
 
 		_ = sitemap.ParseFromSite(sitemapURL, func(entry sitemap.Entry) error {
-			crawler.PageCollector.Visit(entry.GetLocation())
+			if err := crawler.PageCollector.Visit(entry.GetLocation()); err != nil {
+				fmt.Println(err)
+			}
+
 			return nil
 		})
 

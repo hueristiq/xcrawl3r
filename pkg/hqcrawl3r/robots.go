@@ -44,7 +44,9 @@ func (crawler *Crawler) ParseRobots() {
 
 				URL = fmt.Sprintf("%s://%s%s", crawler.URL.Scheme, crawler.URL.Host, URL)
 
-				crawler.PageCollector.Visit(URL)
+				if err = crawler.PageCollector.Visit(URL); err != nil {
+					fmt.Println(err)
+				}
 			}
 		}
 	}

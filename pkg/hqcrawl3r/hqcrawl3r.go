@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	urlz "net/url"
+	"net/url"
 	"os"
 	"regexp"
 	"strings"
@@ -15,7 +15,6 @@ import (
 	"github.com/gocolly/colly/v2"
 	"github.com/gocolly/colly/v2/debug"
 	"github.com/gocolly/colly/v2/extensions"
-	"github.com/hueristiq/hqcrawl3r/pkg/hqcrawl3r/browser"
 	hqurl "github.com/hueristiq/hqgoutils/url"
 )
 
@@ -37,11 +36,9 @@ type Options struct {
 	Delay             int
 	Depth             int
 	Headers           string
-	Headless          bool
 	IncludeSubdomains bool
 	MaxRandomDelay    int // seconds
 	Proxy             string
-	Render            bool
 	RenderTimeout     int // seconds
 	Threads           int
 	Timeout           int // seconds
@@ -63,12 +60,10 @@ func New(options *Options) (crawler Crawler, err error) {
 
 	crawler.PageCollector = colly.NewCollector(
 		colly.IgnoreRobotsTxt(),
-		// limit crawling to the domain of the specified URL
 		colly.AllowedDomains(options.AllowedDomains...),
-		// set MaxDepth to the specified depth
 		colly.MaxDepth(crawler.Configuration.Depth),
-		// specify Async for threading
 		colly.Async(true),
+		colly.AllowURLRevisit(),
 	)
 
 	// if -subs is present, use regex to filter out subdomains in scope.
@@ -101,7 +96,7 @@ func New(options *Options) (crawler Crawler, err error) {
 	}
 
 	if crawler.Configuration.Proxy != "" {
-		pU, err := urlz.Parse(crawler.Configuration.Proxy)
+		pU, err := url.Parse(crawler.Configuration.Proxy)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 		} else {
@@ -188,36 +183,28 @@ func New(options *Options) (crawler Crawler, err error) {
 }
 
 func (crawler *Crawler) Crawl() (results chan string, err error) {
-	if crawler.Configuration.Render {
-		// If we're using a proxy send it to the chrome instance
-		browser.GlobalContext, browser.GlobalCancel = browser.GetGlobalContext(crawler.Configuration.Headless, crawler.Configuration.Proxy)
-
-		// Close the main tab when we end the main() function
-		defer browser.GlobalCancel()
-
-		// If renderJavascript, pass the response's body to the renderer and then replace the body for .OnHTML to handle.
-		crawler.PageCollector.OnResponse(func(request *colly.Response) {
-			html := browser.GetRenderedSource(request.Request.URL.String())
-			request.Body = []byte(html)
-		})
-	}
-
 	crawler.PageCollector.OnRequest(func(request *colly.Request) {
 		URL := strings.TrimRight(request.URL.String(), "/")
 
 		if _, exists := visitedURLs.Load(URL); exists {
 			request.Abort()
+
 			return
 		}
 
 		if match := crawler.URLsNotToRequestRegex.MatchString(URL); match {
 			request.Abort()
+
 			return
 		}
 
 		if match := crawler.URLsToLinkFindRegex.MatchString(URL); match {
-			crawler.LinkFindCollector.Visit(URL)
+			if err = crawler.LinkFindCollector.Visit(URL); err != nil {
+				fmt.Println(err)
+			}
+
 			request.Abort()
+
 			return
 		}
 
@@ -240,7 +227,7 @@ func (crawler *Crawler) Crawl() (results chan string, err error) {
 		foundURLs.Store(URL, struct{}{})
 	})
 
-	crawler.PageCollector.OnHTML("*[href]", func(e *colly.HTMLElement) {
+	crawler.PageCollector.OnHTML("[href]", func(e *colly.HTMLElement) {
 		relativeURL := e.Attr("href")
 		absoluteURL := e.Request.AbsoluteURL(relativeURL)
 
@@ -255,11 +242,13 @@ func (crawler *Crawler) Crawl() (results chan string, err error) {
 		foundURLs.Store(absoluteURL, struct{}{})
 
 		if _, exists := visitedURLs.Load(absoluteURL); !exists {
-			e.Request.Visit(relativeURL)
+			if err = e.Request.Visit(relativeURL); err != nil {
+				return
+			}
 		}
 	})
 
-	crawler.PageCollector.OnHTML("script[src]", func(e *colly.HTMLElement) {
+	crawler.PageCollector.OnHTML("[src]", func(e *colly.HTMLElement) {
 		relativeURL := e.Attr("src")
 		absoluteURL := e.Request.AbsoluteURL(relativeURL)
 
@@ -274,7 +263,9 @@ func (crawler *Crawler) Crawl() (results chan string, err error) {
 		foundURLs.Store(absoluteURL, struct{}{})
 
 		if _, exists := visitedURLs.Load(absoluteURL); !exists {
-			e.Request.Visit(relativeURL)
+			if err = e.Request.Visit(relativeURL); err != nil {
+				return
+			}
 		}
 	})
 
@@ -283,6 +274,7 @@ func (crawler *Crawler) Crawl() (results chan string, err error) {
 
 		if _, exists := visitedURLs.Load(URL); exists {
 			request.Abort()
+
 			return
 		}
 
@@ -291,7 +283,10 @@ func (crawler *Crawler) Crawl() (results chan string, err error) {
 			js := strings.ReplaceAll(URL, ".min.js", ".js")
 
 			if _, exists := visitedURLs.Load(js); !exists {
-				crawler.LinkFindCollector.Visit(js)
+				if err = crawler.LinkFindCollector.Visit(js); err != nil {
+					return
+				}
+
 				visitedURLs.Store(js, struct{}{})
 			}
 		}
@@ -342,12 +337,16 @@ func (crawler *Crawler) Crawl() (results chan string, err error) {
 			}
 
 			if _, exists := visitedURLs.Load(URL); !exists {
-				crawler.PageCollector.Visit(URL)
+				if err = crawler.PageCollector.Visit(URL); err != nil {
+					return
+				}
 			}
 		}
 	})
 
-	crawler.PageCollector.Visit(crawler.URL.String())
+	if err = crawler.PageCollector.Visit(crawler.URL.String()); err != nil {
+		return
+	}
 
 	// Async means we must .Wait() on each Collector
 	crawler.PageCollector.Wait()
