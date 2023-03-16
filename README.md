@@ -18,12 +18,10 @@
 
 ## Features
 
-* Recursively crawls webpages URLs.
-* Parses sitemap
-* Parses robots.txt
-* Extracts URLs from documents *(i.e js, json, xml, csv, txt e.t.c)*.
-* Supports javaScript rendering *(including Single Page Applications such as Angular, React, e.t.c)*.
-* Supports customizable parallelism.
+* Parses sitemap for URLs
+* Parses `robots.txt` for URLs
+* Recursively crawls webpages for URLs.
+* Parses documents (`js`, `json`, `xml`, `csv`, `txt`, e.t.c) for URLs.
 
 ## Installation
 
