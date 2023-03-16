@@ -152,4 +152,4 @@ OPTIONS:
 
 ## Licensing
 
-The tool is licensed under the [MIT license](./LICENSE)
+This utility is distributed under the [MIT license](./LICENSE)
