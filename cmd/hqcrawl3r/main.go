@@ -17,36 +17,32 @@ import (
 )
 
 var (
-	concurrency           int
-	debug                 bool
-	depth                 int
-	headers               []string
-	includeSubdomains     bool
-	proxy                 string
-	delay                 int
-	maxRandomDelay        int
-	parallelism           int
-	timeout               int
-	userAgent             string
-	targetURL, targetURLs string
-	monochrome            bool
-	verbosity             string
+	targetURL, targetURLs          string
+	includeSubdomains              bool
+	depth                          int
+	userAgent                      string
+	headers                        []string
+	timeout, delay, maxRandomDelay int
+	proxy                          string
+	parallelism, concurrency       int
+	debug, monochrome              bool
+	verbosity                      string
 )
 
 func init() {
-	pflag.IntVarP(&concurrency, "concurrency", "c", 10, "")
-	pflag.BoolVar(&debug, "debug", false, "")
-	pflag.IntVarP(&depth, "depth", "d", 2, "")
-	pflag.StringSliceVarP(&headers, "headers", "H", []string{}, "")
-	pflag.BoolVar(&includeSubdomains, "include-subs", false, "")
-	pflag.StringVar(&proxy, "proxy", "", "")
-	pflag.IntVar(&delay, "delay", 1, "")
-	pflag.IntVar(&maxRandomDelay, "max-random-delay", 1, "")
-	pflag.IntVarP(&parallelism, "parallelism", "p", 10, "")
-	pflag.IntVar(&timeout, "timeout", 10, "")
 	pflag.StringVarP(&targetURL, "url", "u", "", "")
 	pflag.StringVarP(&targetURLs, "urls", "U", "", "")
+	pflag.BoolVar(&includeSubdomains, "include-subs", false, "")
+	pflag.IntVarP(&depth, "depth", "d", 2, "")
 	pflag.StringVar(&userAgent, "user-agent", "web", "")
+	pflag.StringSliceVarP(&headers, "headers", "H", []string{}, "")
+	pflag.IntVar(&timeout, "timeout", 10, "")
+	pflag.IntVar(&delay, "delay", 1, "")
+	pflag.IntVar(&maxRandomDelay, "max-random-delay", 1, "")
+	pflag.StringVar(&proxy, "proxy", "", "")
+	pflag.IntVarP(&parallelism, "parallelism", "p", 10, "")
+	pflag.IntVarP(&concurrency, "concurrency", "c", 10, "")
+	pflag.BoolVar(&debug, "debug", false, "")
 	pflag.BoolVarP(&monochrome, "monochrome", "m", false, "")
 	pflag.StringVarP(&verbosity, "verbosity", "v", string(levels.LevelInfo), "")
 
@@ -180,7 +176,10 @@ func main() {
 				go func() {
 					defer wg.Done()
 
-					crawler.Crawl()
+					_, err = crawler.Run()
+					if err != nil {
+						hqlog.Error().Msgf("%s", err)
+					}
 				}()
 
 				wg.Add(1)

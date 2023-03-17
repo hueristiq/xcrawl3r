@@ -2,7 +2,6 @@ package hqcrawl3r
 
 import (
 	"crypto/tls"
-	"fmt"
 	"net"
 	"net/http"
 	"net/url"
@@ -21,8 +20,8 @@ type Crawler struct {
 	URL                   *hqurl.URL
 	Options               *Options
 	PageCollector         *colly.Collector
+	FilesRegex            *regexp.Regexp
 	FileCollector         *colly.Collector
-	URLsToLinkFindRegex   *regexp.Regexp
 	URLsNotToRequestRegex *regexp.Regexp
 }
 
@@ -41,10 +40,12 @@ type Options struct {
 	UserAgent         string
 }
 
-var foundURLs sync.Map
-var visitedURLs sync.Map
+var (
+	foundURLs, visitedURLs sync.Map
+)
 
-func New(options *Options) (crawler Crawler, err error) {
+func New(options *Options) (crawler *Crawler, err error) {
+	crawler = &Crawler{}
 	crawler.URL = options.TargetURL
 	crawler.Options = options
 
@@ -53,7 +54,6 @@ func New(options *Options) (crawler Crawler, err error) {
 		colly.MaxDepth(crawler.Options.Depth),
 		colly.IgnoreRobotsTxt(),
 		colly.Async(true),
-		colly.AllowURLRevisit(),
 	)
 
 	if crawler.Options.IncludeSubdomains {
@@ -157,21 +157,23 @@ func New(options *Options) (crawler Crawler, err error) {
 	crawler.PageCollector.ID = 1
 	crawler.FileCollector.ID = 2
 
-	crawler.URLsToLinkFindRegex = regexp.MustCompile(`(?m).*?\.*(js|json|xml|csv|txt|map)(\?.*?|)$`)
+	crawler.FilesRegex = regexp.MustCompile(`(?m).*?\.*(js|json|xml|csv|txt|map)(\?.*?|)$`)
 	crawler.URLsNotToRequestRegex = regexp.MustCompile(`(?i)\.(apng|bpm|png|bmp|gif|heif|ico|cur|jpg|jpeg|jfif|pjp|pjpeg|psd|raw|svg|tif|tiff|webp|xbm|3gp|aac|flac|mpg|mpeg|mp3|mp4|m4a|m4v|m4p|oga|ogg|ogv|mov|wav|webm|eot|woff|woff2|ttf|otf|css)(?:\?|#|$)`)
 
 	return
 }
 
-func (crawler *Crawler) Crawl() (results chan string, err error) {
+func (crawler *Crawler) toFileCollector(URL string) (err error) {
+	if err = crawler.FileCollector.Visit(URL); err != nil {
+		return
+	}
+
+	return
+}
+
+func (crawler *Crawler) Run() (results chan string, err error) {
 	crawler.PageCollector.OnRequest(func(request *colly.Request) {
 		URL := strings.TrimRight(request.URL.String(), "/")
-
-		if _, exists := visitedURLs.Load(URL); exists {
-			request.Abort()
-
-			return
-		}
 
 		if match := crawler.URLsNotToRequestRegex.MatchString(URL); match {
 			request.Abort()
@@ -179,33 +181,13 @@ func (crawler *Crawler) Crawl() (results chan string, err error) {
 			return
 		}
 
-		if match := crawler.URLsToLinkFindRegex.MatchString(URL); match {
-			if err = crawler.FileCollector.Visit(URL); err != nil {
-				fmt.Println(err)
-			}
-
+		if _, exists := visitedURLs.Load(URL); exists {
 			request.Abort()
 
 			return
 		}
 
 		visitedURLs.Store(URL, struct{}{})
-
-		return
-	})
-
-	crawler.FileCollector.OnResponse(func(response *colly.Response) {
-		URL := strings.TrimRight(response.Request.URL.String(), "/")
-
-		if _, exists := foundURLs.Load(URL); !exists {
-			return
-		}
-
-		if err := crawler.record(URL); err != nil {
-			return
-		}
-
-		foundURLs.Store(URL, struct{}{})
 	})
 
 	crawler.PageCollector.OnHTML("[href]", func(e *colly.HTMLElement) {
@@ -244,6 +226,14 @@ func (crawler *Crawler) Crawl() (results chan string, err error) {
 		foundURLs.Store(absoluteURL, struct{}{})
 
 		if _, exists := visitedURLs.Load(absoluteURL); !exists {
+			if match := crawler.FilesRegex.MatchString(absoluteURL); match {
+				if err = crawler.toFileCollector(absoluteURL); err != nil {
+					return
+				}
+
+				return
+			}
+
 			if err = e.Request.Visit(relativeURL); err != nil {
 				return
 			}
@@ -267,8 +257,6 @@ func (crawler *Crawler) Crawl() (results chan string, err error) {
 				if err = crawler.FileCollector.Visit(js); err != nil {
 					return
 				}
-
-				visitedURLs.Store(js, struct{}{})
 			}
 		}
 
@@ -276,16 +264,16 @@ func (crawler *Crawler) Crawl() (results chan string, err error) {
 	})
 
 	crawler.FileCollector.OnResponse(func(response *colly.Response) {
-		links, err := crawler.FindLinks(string(response.Body))
+		body := decode(string(response.Body))
+
+		links, err := extractLinks(body)
 		if err != nil {
 			return
 		}
 
-		if len(links) < 1 {
-			return
-		}
+		for index := range links {
+			link := links[index]
 
-		for _, link := range links {
 			// Skip blank entries
 			if len(link) <= 0 {
 				continue
@@ -329,7 +317,6 @@ func (crawler *Crawler) Crawl() (results chan string, err error) {
 		return
 	}
 
-	// Async means we must .Wait() on each Collector
 	crawler.PageCollector.Wait()
 	crawler.FileCollector.Wait()
 

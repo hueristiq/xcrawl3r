@@ -2,7 +2,7 @@ package hqcrawl3r
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"regexp"
 	"strings"
@@ -29,7 +29,7 @@ func (crawler *Crawler) ParseRobots() {
 			foundURLs.Store(robotsURL, struct{}{})
 		}
 
-		body, err := ioutil.ReadAll(res.Body)
+		body, err := io.ReadAll(res.Body)
 		if err != nil {
 			return
 		}

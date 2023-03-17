@@ -9,6 +9,26 @@ import (
 	hqurl "github.com/hueristiq/hqgoutils/url"
 )
 
+var lfRegex = regexp.MustCompile(`(?:"|')(((?:[a-zA-Z]{1,10}://|//)[^"'/]{1,}\.[a-zA-Z]{2,}[^"']{0,})|((?:/|\.\./|\./)[^"'><,;| *()(%%$^/\\\[\]][^"'><,;|()]{1,})|([a-zA-Z0-9_\-/]{1,}/[a-zA-Z0-9_\-/]{1,}\.(?:[a-zA-Z]{1,4}|action)(?:[\?|#][^"|']{0,}|))|([a-zA-Z0-9_\-/]{1,}/[a-zA-Z0-9_\-/]{3,}(?:[\?|#][^"|']{0,}|))|([a-zA-Z0-9_\-]{1,}\.(?:php|asp|aspx|jsp|json|action|html|js|txt|xml)(?:[\?|#][^"|']{0,}|)))(?:"|')`)
+
+func decode(source string) (decodedSource string) {
+	replacer := strings.NewReplacer(
+		`\u002f`, "/",
+		`\u0026`, "&",
+	)
+
+	decodedSource = replacer.Replace(source)
+
+	return
+}
+
+func extractLinks(source string) (links []string, err error) {
+	links = []string{}
+	links = append(links, lfRegex.FindAllString(source, -1)...)
+
+	return
+}
+
 func (crawler *Crawler) fixURL(URL string) (fixedURL string) {
 	// decode
 	// this ....
@@ -41,21 +61,7 @@ func (crawler *Crawler) fixURL(URL string) (fixedURL string) {
 	return
 }
 
-func decode(URL string) string {
-	// In case json encoded chars
-	replacer := strings.NewReplacer(
-		`\u002f`, "/",
-		`\u0026`, "&",
-	)
-
-	URL = replacer.Replace(strings.ToLower(URL))
-
-	return URL
-}
-
 func (crawler *Crawler) record(URL string) (err error) {
-	URL = decode(URL)
-
 	parsedURL, err := hqurl.Parse(URL)
 	if err != nil {
 		return
