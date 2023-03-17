@@ -63,7 +63,7 @@ func (crawler *Crawler) record(URL string) (err error) {
 
 	print := false
 
-	if crawler.Configuration.IncludeSubdomains {
+	if crawler.Options.IncludeSubdomains {
 		escapedHost := strings.ReplaceAll(crawler.URL.Host, ".", "\\.")
 		print, _ = regexp.MatchString(".*(\\.|\\/\\/)"+escapedHost+"((#|\\/|\\?).*)?", URL)
 	} else {

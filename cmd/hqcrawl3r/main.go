@@ -18,14 +18,14 @@ import (
 
 var (
 	concurrency           int
-	cookies               string
 	debug                 bool
 	depth                 int
-	headers               string
+	headers               []string
 	includeSubdomains     bool
 	proxy                 string
+	delay                 int
 	maxRandomDelay        int
-	threads               int
+	parallelism           int
 	timeout               int
 	userAgent             string
 	targetURL, targetURLs string
@@ -34,15 +34,15 @@ var (
 )
 
 func init() {
-	pflag.IntVarP(&concurrency, "concurrency", "c", 5, "")
-	pflag.StringVar(&cookies, "cookie", "", "")
+	pflag.IntVarP(&concurrency, "concurrency", "c", 10, "")
 	pflag.BoolVar(&debug, "debug", false, "")
 	pflag.IntVarP(&depth, "depth", "d", 2, "")
-	pflag.StringVarP(&headers, "headers", "H", "", "")
+	pflag.StringSliceVarP(&headers, "headers", "H", []string{}, "")
 	pflag.BoolVar(&includeSubdomains, "include-subs", false, "")
-	pflag.StringVarP(&proxy, "proxy", "p", "", "")
-	pflag.IntVarP(&maxRandomDelay, "random-delay", "R", 60, "")
-	pflag.IntVar(&threads, "threads", 20, "")
+	pflag.StringVar(&proxy, "proxy", "", "")
+	pflag.IntVar(&delay, "delay", 1, "")
+	pflag.IntVar(&maxRandomDelay, "max-random-delay", 1, "")
+	pflag.IntVarP(&parallelism, "parallelism", "p", 10, "")
 	pflag.IntVar(&timeout, "timeout", 10, "")
 	pflag.StringVarP(&targetURL, "url", "u", "", "")
 	pflag.StringVarP(&targetURLs, "urls", "U", "", "")
@@ -58,27 +58,27 @@ func init() {
 		h += "  hqcrawl3r [OPTIONS]\n"
 
 		h += "\nOPTIONS:\n"
-		h += "  -c, --concurrency          Maximum concurrent requests for matching domains (default: 5)\n"
-		h += "      --cookie               Cookie to use (testA=a; testB=b)\n"
-		h += "      --debug                Enable debug mode (default: false)\n"
-		h += "  -d, --depth                Maximum recursion depth on visited URLs. (default: 1)\n"
-		h += "                                 Note: Requires '-r, --render' flag\n"
-		h += "                                 Note: Usage to show browser: '--headless=false' (default true)\n"
-		h += "  -H, --headers              Custom headers separated by two semi-colons.\n"
-		h += "                                 E.g. -h 'Cookie: foo=bar;;Referer: http://example.com/'\n"
-		h += "      --include-subs         Extend scope to include subdomains (default: false)\n"
-		h += "  -p, --proxy                Proxy URL (e.g: http://127.0.0.1:8080)\n"
-		h += "  -R, --random-delay         Maximum random delay between requests (default: 2s)\n"
-		h += "  -t, --threads              Number of threads (Run URLs in parallel) (default: 20)\n"
-		h += "      --timeout              Request timeout (second) (default: 10)\n"
-		h += "  -u, --url                  URL to crawl\n"
-		h += "  -U, --urls                 URLs to crawl\n"
+		h += "  -u, --url                  target URL\n"
+		h += "  -U, --urls                 target URLs\n"
+		h += "      --include-subs         extend scope to include subdomains (default: false)\n"
+		h += "  -d, --depth                maximum recursion depth on visited URLs. (default: 1)\n"
+		h += "                                 TIP: set it to `0` for infinite recursion\n"
 		h += "      --user-agent           User Agent to use (default: web)\n"
-		h += "                                 `web` for a random web user-agent\n"
-		h += "                                 `mobile` for a random mobile user-agent\n"
-		h += "                                 or you can set your special user-agent\n"
-		h += "  -m, --monochrome                coloring: no colored output mode\n"
-		h += "  -v, --verbosity                 debug, info, warning, error, fatal or silent (default: debug)\n"
+		h += "                                 TIP: use `web` for a random web user-agent,\n"
+		h += "                                 `mobile` for a random mobile user-agent,\n"
+		h += "                                  or you can set your specific user-agent.\n"
+		h += "  -H, --headers              custom header to include in requests\n"
+		h += "                                 e.g. -H 'Referer: http://example.com/'\n"
+		h += "                                 TIP: use multiple flag to set multiple headers\n"
+		h += "      --timeout              time to wait for request in seconds (default: 10)\n"
+		h += "      --delay                delay between request to matching domains (default: 1s)\n"
+		h += "      --max-random-delay     extra randomized delay added to `--dalay` (default: 1s)\n"
+		h += "      --proxy                Proxy URL (e.g: http://127.0.0.1:8080)\n"
+		h += "  -p, --parallelism          number of concurrent URLs to process (default: 10)\n"
+		h += "  -c, --concurrency          number of concurrent requests for matching domains (default: 10)\n"
+		h += "      --debug                enable debug mode (default: false)\n"
+		h += "  -m, --monochrome           coloring: no colored output mode\n"
+		h += "  -v, --verbosity            debug, info, warning, error, fatal or silent (default: debug)\n"
 
 		fmt.Fprint(os.Stderr, h)
 	}
@@ -136,10 +136,10 @@ func main() {
 		}
 	}
 
-	URLsCH := make(chan string, threads)
+	URLsCH := make(chan string, parallelism)
 	URLsWG := new(sync.WaitGroup)
 
-	for i := 0; i < threads; i++ {
+	for i := 0; i < parallelism; i++ {
 		URLsWG.Add(1)
 
 		go func() {
@@ -156,14 +156,13 @@ func main() {
 				options := &hqcrawl3r.Options{
 					TargetURL:         parsedURL,
 					Concurrency:       concurrency,
-					Cookie:            cookies,
 					Debug:             debug,
 					Depth:             depth,
 					Headers:           headers,
 					IncludeSubdomains: includeSubdomains,
+					Delay:             delay,
 					MaxRandomDelay:    maxRandomDelay,
 					Proxy:             proxy,
-					Threads:           threads,
 					Timeout:           timeout,
 					UserAgent:         userAgent,
 				}

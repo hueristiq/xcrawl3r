@@ -121,29 +121,27 @@ USAGE:
   hqcrawl3r [OPTIONS]
 
 OPTIONS:
-  -c, --concurrency          Maximum concurrent requests for matching domains (default: 5)
-      --cookie               Cookie to use (testA=a; testB=b)
-      --debug                Enable debug mode (default: false)
-  -d, --depth                Maximum recursion depth on visited URLs. (default: 1)
-      --headless             If true the browser will be displayed while crawling
-                                 Note: Requires '-r, --render' flag
-                                 Note: Usage to show browser: '--headless=false' (default true)
-  -H, --headers              Custom headers separated by two semi-colons.
-                                 E.g. -h 'Cookie: foo=bar;;Referer: http://example.com/'
-      --include-subs         Extend scope to include subdomains (default: false)
-      --no-color             Enable no color mode (default: false)
-  -p, --proxy                Proxy URL (e.g: http://127.0.0.1:8080)
-  -R, --random-delay         Maximum random delay between requests (default: 2s)
-  -r, --render               Render javascript.
-  -s, --silent               Enable silent mode: output urls only (default: false)
-  -t, --threads              Number of threads (Run URLs in parallel) (default: 20)
-      --timeout              Request timeout (second) (default: 10)
-  -u, --url                  URL to crawl
-  -U, --urls                 URLs to crawl
+  -u, --url                  target URL
+  -U, --urls                 target URLs
+      --include-subs         extend scope to include subdomains (default: false)
+  -d, --depth                maximum recursion depth on visited URLs. (default: 1)
+                                 TIP: set it to `0` for infinite recursion
       --user-agent           User Agent to use (default: web)
-                                 `web` for a random web user-agent
-                                 `mobile` for a random mobile user-agent
-                                 or you can set your special user-agent
+                                 TIP: use `web` for a random web user-agent,
+                                 `mobile` for a random mobile user-agent,
+                                  or you can set your specific user-agent.
+  -H, --headers              custom header to include in requests
+                                 e.g. -H 'Referer: http://example.com/'
+                                 TIP: use multiple flag to set multiple headers
+      --timeout              time to wait for request in seconds (default: 10)
+      --delay                delay between request to matching domains (default: 1s)
+      --max-random-delay     extra randomized delay added to `--dalay` (default: 1s)
+      --proxy                Proxy URL (e.g: http://127.0.0.1:8080)
+  -p, --parallelism          number of concurrent URLs to process (default: 10)
+  -c, --concurrency          number of concurrent requests for matching domains (default: 10)
+      --debug                enable debug mode (default: false)
+  -m, --monochrome           coloring: no colored output mode
+  -v, --verbosity            debug, info, warning, error, fatal or silent (default: debug)
 ```
 
 ## Contributing

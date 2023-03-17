@@ -6,7 +6,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"os"
 	"regexp"
 	"strings"
 	"sync"
@@ -20,27 +19,24 @@ import (
 
 type Crawler struct {
 	URL                   *hqurl.URL
-	Configuration         *Options
+	Options               *Options
 	PageCollector         *colly.Collector
-	LinkFindCollector     *colly.Collector
+	FileCollector         *colly.Collector
 	URLsToLinkFindRegex   *regexp.Regexp
 	URLsNotToRequestRegex *regexp.Regexp
 }
 
 type Options struct {
 	TargetURL         *hqurl.URL
-	AllowedDomains    []string
 	Concurrency       int
-	Cookie            string
 	Debug             bool
 	Delay             int
 	Depth             int
-	Headers           string
+	Headers           []string
 	IncludeSubdomains bool
 	MaxRandomDelay    int // seconds
 	Proxy             string
 	RenderTimeout     int // seconds
-	Threads           int
 	Timeout           int // seconds
 	UserAgent         string
 }
@@ -50,40 +46,30 @@ var visitedURLs sync.Map
 
 func New(options *Options) (crawler Crawler, err error) {
 	crawler.URL = options.TargetURL
-	crawler.Configuration = options
-
-	if options.AllowedDomains == nil {
-		options.AllowedDomains = []string{}
-	}
-
-	options.AllowedDomains = append(options.AllowedDomains, []string{crawler.URL.Domain, "www." + crawler.URL.Domain}...)
+	crawler.Options = options
 
 	crawler.PageCollector = colly.NewCollector(
+		colly.AllowedDomains(crawler.URL.Domain, "www."+crawler.URL.Domain),
+		colly.MaxDepth(crawler.Options.Depth),
 		colly.IgnoreRobotsTxt(),
-		colly.AllowedDomains(options.AllowedDomains...),
-		colly.MaxDepth(crawler.Configuration.Depth),
 		colly.Async(true),
 		colly.AllowURLRevisit(),
 	)
 
-	// if -subs is present, use regex to filter out subdomains in scope.
-	if crawler.Configuration.IncludeSubdomains {
+	if crawler.Options.IncludeSubdomains {
 		crawler.PageCollector.AllowedDomains = nil
 		crawler.PageCollector.URLFilters = []*regexp.Regexp{
 			regexp.MustCompile(".*(\\.|\\/\\/)" + strings.ReplaceAll(crawler.URL.Domain, ".", "\\.") + "((#|\\/|\\?).*)?"),
 		}
 	}
 
-	// Debug
-	if crawler.Configuration.Debug {
+	if crawler.Options.Debug {
 		crawler.PageCollector.SetDebugger(&debug.LogDebugger{})
 	}
 
-	// Setup the client with our transport to pass to the collectors
-	// NOTE: Must come BEFORE .SetClient calls
 	transport := &http.Transport{
 		DialContext: (&net.Dialer{
-			Timeout:   time.Duration(crawler.Configuration.Timeout) * time.Second,
+			Timeout:   time.Duration(crawler.Options.Timeout) * time.Second,
 			KeepAlive: 30 * time.Second,
 		}).DialContext,
 		MaxIdleConns:    100,
@@ -95,18 +81,20 @@ func New(options *Options) (crawler Crawler, err error) {
 		},
 	}
 
-	if crawler.Configuration.Proxy != "" {
-		pU, err := url.Parse(crawler.Configuration.Proxy)
+	if crawler.Options.Proxy != "" {
+		var pU *url.URL
+
+		pU, err = url.Parse(crawler.Options.Proxy)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-		} else {
-			transport.Proxy = http.ProxyURL(pU)
+			return
 		}
+
+		transport.Proxy = http.ProxyURL(pU)
 	}
 
 	client := &http.Client{
 		Transport: transport,
-		Timeout:   time.Duration(crawler.Configuration.Timeout) * time.Second,
+		Timeout:   time.Duration(crawler.Options.Timeout) * time.Second,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			nextLocation := req.Response.Header.Get("Location")
 
@@ -120,66 +108,59 @@ func New(options *Options) (crawler Crawler, err error) {
 
 	crawler.PageCollector.SetClient(client)
 
-	// set cookie
-	if crawler.Configuration.Cookie != "" {
-		crawler.PageCollector.OnRequest(func(request *colly.Request) {
-			request.Headers.Set("Cookie", crawler.Configuration.Cookie)
-		})
-	}
-
-	// set headers
-	if crawler.Configuration.Headers != "" {
-		crawler.PageCollector.OnRequest(func(request *colly.Request) {
-			headers := strings.Split(crawler.Configuration.Headers, ";;")
-			for _, header := range headers {
-				var parts []string
-
-				if strings.Contains(header, ": ") {
-					parts = strings.SplitN(header, ": ", 2)
-				} else if strings.Contains(header, ":") {
-					parts = strings.SplitN(header, ":", 2)
-				} else {
-					continue
-				}
-
-				request.Headers.Set(strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1]))
-			}
-		})
-	}
-
-	// Set User-Agent
-	switch ua := strings.ToLower(crawler.Configuration.UserAgent); {
+	switch ua := strings.ToLower(crawler.Options.UserAgent); {
 	case strings.HasPrefix(ua, "mobi"):
 		extensions.RandomMobileUserAgent(crawler.PageCollector)
 	case strings.HasPrefix(ua, "web"):
 		extensions.RandomUserAgent(crawler.PageCollector)
 	default:
-		crawler.PageCollector.UserAgent = ua
+		crawler.PageCollector.UserAgent = crawler.Options.UserAgent
 	}
 
-	// Referer
+	if crawler.Options.Headers != nil && len(crawler.Options.Headers) > 0 {
+		crawler.PageCollector.OnRequest(func(request *colly.Request) {
+			for index := range crawler.Options.Headers {
+				entry := crawler.Options.Headers[index]
+
+				var splitEntry []string
+
+				if strings.Contains(entry, ": ") {
+					splitEntry = strings.SplitN(entry, ": ", 2)
+				} else if strings.Contains(entry, ":") {
+					splitEntry = strings.SplitN(entry, ":", 2)
+				} else {
+					continue
+				}
+
+				header := strings.TrimSpace(splitEntry[0])
+				value := splitEntry[1]
+
+				request.Headers.Set(header, value)
+			}
+		})
+	}
+
 	extensions.Referer(crawler.PageCollector)
 
-	// Set parallelism
 	if err = crawler.PageCollector.Limit(&colly.LimitRule{
 		DomainGlob:  "*",
-		Parallelism: crawler.Configuration.Concurrency,
-		Delay:       time.Duration(crawler.Configuration.Delay) * time.Second,
-		RandomDelay: time.Duration(crawler.Configuration.MaxRandomDelay) * time.Second,
+		Parallelism: crawler.Options.Concurrency,
+		Delay:       time.Duration(crawler.Options.Delay) * time.Second,
+		RandomDelay: time.Duration(crawler.Options.MaxRandomDelay) * time.Second,
 	}); err != nil {
 		return
 	}
 
-	crawler.LinkFindCollector = crawler.PageCollector.Clone()
-	crawler.LinkFindCollector.URLFilters = nil
+	crawler.FileCollector = crawler.PageCollector.Clone()
+	crawler.FileCollector.URLFilters = nil
 
 	crawler.PageCollector.ID = 1
-	crawler.LinkFindCollector.ID = 2
+	crawler.FileCollector.ID = 2
 
 	crawler.URLsToLinkFindRegex = regexp.MustCompile(`(?m).*?\.*(js|json|xml|csv|txt|map)(\?.*?|)$`)
 	crawler.URLsNotToRequestRegex = regexp.MustCompile(`(?i)\.(apng|bpm|png|bmp|gif|heif|ico|cur|jpg|jpeg|jfif|pjp|pjpeg|psd|raw|svg|tif|tiff|webp|xbm|3gp|aac|flac|mpg|mpeg|mp3|mp4|m4a|m4v|m4p|oga|ogg|ogv|mov|wav|webm|eot|woff|woff2|ttf|otf|css)(?:\?|#|$)`)
 
-	return crawler, nil
+	return
 }
 
 func (crawler *Crawler) Crawl() (results chan string, err error) {
@@ -199,7 +180,7 @@ func (crawler *Crawler) Crawl() (results chan string, err error) {
 		}
 
 		if match := crawler.URLsToLinkFindRegex.MatchString(URL); match {
-			if err = crawler.LinkFindCollector.Visit(URL); err != nil {
+			if err = crawler.FileCollector.Visit(URL); err != nil {
 				fmt.Println(err)
 			}
 
@@ -213,7 +194,7 @@ func (crawler *Crawler) Crawl() (results chan string, err error) {
 		return
 	})
 
-	crawler.LinkFindCollector.OnResponse(func(response *colly.Response) {
+	crawler.FileCollector.OnResponse(func(response *colly.Response) {
 		URL := strings.TrimRight(response.Request.URL.String(), "/")
 
 		if _, exists := foundURLs.Load(URL); !exists {
@@ -269,7 +250,7 @@ func (crawler *Crawler) Crawl() (results chan string, err error) {
 		}
 	})
 
-	crawler.LinkFindCollector.OnRequest(func(request *colly.Request) {
+	crawler.FileCollector.OnRequest(func(request *colly.Request) {
 		URL := request.URL.String()
 
 		if _, exists := visitedURLs.Load(URL); exists {
@@ -283,7 +264,7 @@ func (crawler *Crawler) Crawl() (results chan string, err error) {
 			js := strings.ReplaceAll(URL, ".min.js", ".js")
 
 			if _, exists := visitedURLs.Load(js); !exists {
-				if err = crawler.LinkFindCollector.Visit(js); err != nil {
+				if err = crawler.FileCollector.Visit(js); err != nil {
 					return
 				}
 
@@ -294,7 +275,7 @@ func (crawler *Crawler) Crawl() (results chan string, err error) {
 		visitedURLs.Store(URL, struct{}{})
 	})
 
-	crawler.LinkFindCollector.OnResponse(func(response *colly.Response) {
+	crawler.FileCollector.OnResponse(func(response *colly.Response) {
 		links, err := crawler.FindLinks(string(response.Body))
 		if err != nil {
 			return
@@ -350,7 +331,7 @@ func (crawler *Crawler) Crawl() (results chan string, err error) {
 
 	// Async means we must .Wait() on each Collector
 	crawler.PageCollector.Wait()
-	crawler.LinkFindCollector.Wait()
+	crawler.FileCollector.Wait()
 
 	return
 }
