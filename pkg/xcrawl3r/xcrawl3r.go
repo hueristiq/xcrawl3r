@@ -108,7 +108,6 @@ func New(options *Options) (crawler *Crawler, err error) {
 		crawler.PageCollector.SetDebugger(&debug.LogDebugger{})
 	}
 
-	// Custom Headers
 	if crawler.Headers != nil && len(crawler.Headers) > 0 {
 		crawler.PageCollector.OnRequest(func(request *colly.Request) {
 			for index := range crawler.Headers {
@@ -132,10 +131,8 @@ func New(options *Options) (crawler *Crawler, err error) {
 		})
 	}
 
-	// Referer
 	extensions.Referer(crawler.PageCollector)
 
-	// User Agent
 	switch ua := strings.ToLower(crawler.UserAgent); {
 	case strings.HasPrefix(ua, "mob"):
 		extensions.RandomMobileUserAgent(crawler.PageCollector)
