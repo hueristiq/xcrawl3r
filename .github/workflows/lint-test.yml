@@ -1,8 +1,18 @@
-name: 💅 lint
+name: 💅 Lint Test
 
 on:
     push:
+        branches:
+            - "main"
+        paths:
+            - '**.go'
+            - '**.mod'
     pull_request:
+        branches:
+          - "main"
+        paths:
+            - '**.go'
+            - '**.mod'
     workflow_dispatch:
 
 permissions:
@@ -10,12 +20,12 @@ permissions:
 
 jobs:
     lint:
-        name: Lint
+        name: Lint Test
         runs-on: ubuntu-latest
         steps:
             -
                 name: Set up Go
-                uses: actions/setup-go@v3
+                uses: actions/setup-go@v4
                 with:
                     go-version:  '>=1.20'
             -
@@ -27,5 +37,4 @@ jobs:
                 name: Run golangci-lint
                 uses: golangci/golangci-lint-action@v3
                 with:
-                    version: v1.51.2
-                    working-directory: .
+                    version: v1.52.2

@@ -1,12 +1,23 @@
-name: 🔨 build
+name: 🔨 Build Test
 
 on:
     push:
+        branches:
+            - "main"
+        paths:
+            - '**.go'
+            - '**.mod'
+    pull_request:
+        branches:
+          - "main"
+        paths:
+            - '**.go'
+            - '**.mod'
     workflow_dispatch:
 
 jobs:
     build:
-        name: Build
+        name: Build Test
         strategy:
             matrix:
                 os: [ubuntu-latest, windows-latest, macOS-12]
@@ -14,7 +25,7 @@ jobs:
         steps:
             -
                 name: Set up Go
-                uses: actions/setup-go@v3
+                uses: actions/setup-go@v4
                 with:
                     go-version:  '>=1.20'
             -
@@ -31,4 +42,4 @@ jobs:
             -
                 name: Go build
                 run: go build -v .
-                working-directory: cmd/hqcrawl3r/
+                working-directory: ./cmd/xcrawl3r
