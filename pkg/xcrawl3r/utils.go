@@ -55,7 +55,7 @@ func (crawler *Crawler) IsInScope(URL string) (isInScope bool) {
 		return
 	}
 
-	if crawler.Options.IncludeSubdomains {
+	if crawler.IncludeSubdomains {
 		isInScope = parsedURL.Domain == crawler.Domain || strings.HasSuffix(parsedURL.Domain, "."+crawler.Domain)
 	} else {
 		isInScope = parsedURL.Domain == crawler.Domain || parsedURL.Domain == "www."+crawler.Domain

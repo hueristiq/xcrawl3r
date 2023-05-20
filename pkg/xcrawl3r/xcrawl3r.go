@@ -21,8 +21,8 @@ type Options struct { //nolint:govet // To be refactored
 	Domain            string
 	IncludeSubdomains bool
 	Seeds             []string
-	Parallelism       int
 	Concurrency       int
+	Parallelism       int
 	Debug             bool
 	Delay             int
 	Depth             int
@@ -38,8 +38,15 @@ type Crawler struct { //nolint:govet // To be refactored
 	Domain                string
 	IncludeSubdomains     bool
 	Seeds                 []string
+	Concurrency           int
 	Parallelism           int
-	Options               *Options
+	Depth                 int
+	Timeout               int
+	MaxRandomDelay        int
+	Debug                 bool
+	Headers               []string
+	UserAgent             string
+	Proxies               []string
 	PageCollector         *colly.Collector
 	FileURLsRegex         *regexp.Regexp
 	FileCollector         *colly.Collector
@@ -52,9 +59,16 @@ func New(options *Options) (crawler *Crawler, err error) {
 		Domain:            options.Domain,
 		IncludeSubdomains: options.IncludeSubdomains,
 		Seeds:             options.Seeds,
+		Concurrency:       options.Concurrency,
 		Parallelism:       options.Parallelism,
+		Depth:             options.Depth,
+		Timeout:           options.Timeout,
+		MaxRandomDelay:    options.MaxRandomDelay,
+		Debug:             options.Debug,
+		Headers:           options.Headers,
+		UserAgent:         options.UserAgent,
+		Proxies:           options.Proxies,
 	}
-	crawler.Options = options
 
 	crawler.URLsRegex = regexp.MustCompile(`(?:"|')(((?:[a-zA-Z]{1,10}://|//)[^"'/]{1,}\.[a-zA-Z]{2,}[^"']{0,})|((?:/|\.\./|\./)[^"'><,;| *()(%%$^/\\\[\]][^"'><,;|()]{1,})|([a-zA-Z0-9_\-/]{1,}/[a-zA-Z0-9_\-/]{1,}\.(?:[a-zA-Z]{1,4}|action)(?:[\?|#][^"|']{0,}|))|([a-zA-Z0-9_\-/]{1,}/[a-zA-Z0-9_\-/]{3,}(?:[\?|#][^"|']{0,}|))|([a-zA-Z0-9_\-]{1,}\.(?:php|asp|aspx|jsp|json|action|html|js|txt|xml)(?:[\?|#][^"|']{0,}|)))(?:"|')`) //nolint:gocritic // Works fine!
 
@@ -65,11 +79,11 @@ func New(options *Options) (crawler *Crawler, err error) {
 	crawler.PageCollector = colly.NewCollector(
 		colly.Async(true),
 		colly.IgnoreRobotsTxt(),
-		colly.MaxDepth(crawler.Options.Depth),
+		colly.MaxDepth(crawler.Depth),
 		colly.AllowedDomains(crawler.Domain, "www."+crawler.Domain),
 	)
 
-	if crawler.Options.IncludeSubdomains {
+	if crawler.IncludeSubdomains {
 		crawler.PageCollector.AllowedDomains = nil
 
 		escapedDomain := regexp.QuoteMeta(crawler.Domain)
@@ -80,25 +94,25 @@ func New(options *Options) (crawler *Crawler, err error) {
 		}
 	}
 
-	crawler.PageCollector.SetRequestTimeout(time.Duration(crawler.Options.Timeout) * time.Second)
+	crawler.PageCollector.SetRequestTimeout(time.Duration(crawler.Timeout) * time.Second)
 
 	if err = crawler.PageCollector.Limit(&colly.LimitRule{
 		DomainGlob:  "*",
-		Parallelism: crawler.Options.Concurrency,
-		RandomDelay: time.Duration(crawler.Options.MaxRandomDelay) * time.Second,
+		Parallelism: crawler.Concurrency,
+		RandomDelay: time.Duration(crawler.MaxRandomDelay) * time.Second,
 	}); err != nil {
 		return
 	}
 
-	if crawler.Options.Debug {
+	if crawler.Debug {
 		crawler.PageCollector.SetDebugger(&debug.LogDebugger{})
 	}
 
 	// Custom Headers
-	if crawler.Options.Headers != nil && len(crawler.Options.Headers) > 0 {
+	if crawler.Headers != nil && len(crawler.Headers) > 0 {
 		crawler.PageCollector.OnRequest(func(request *colly.Request) {
-			for index := range crawler.Options.Headers {
-				entry := crawler.Options.Headers[index]
+			for index := range crawler.Headers {
+				entry := crawler.Headers[index]
 
 				var splitEntry []string
 
@@ -122,24 +136,24 @@ func New(options *Options) (crawler *Crawler, err error) {
 	extensions.Referer(crawler.PageCollector)
 
 	// User Agent
-	switch ua := strings.ToLower(crawler.Options.UserAgent); {
+	switch ua := strings.ToLower(crawler.UserAgent); {
 	case strings.HasPrefix(ua, "mob"):
 		extensions.RandomMobileUserAgent(crawler.PageCollector)
 	case strings.HasPrefix(ua, "web"):
 		extensions.RandomUserAgent(crawler.PageCollector)
 	default:
-		crawler.PageCollector.UserAgent = crawler.Options.UserAgent
+		crawler.PageCollector.UserAgent = crawler.UserAgent
 	}
 
 	HTTPTransport := &http.Transport{
 		DialContext: (&net.Dialer{
-			Timeout:   time.Duration(crawler.Options.Timeout) * time.Second,
-			KeepAlive: time.Duration(crawler.Options.Timeout) * time.Second,
+			Timeout:   time.Duration(crawler.Timeout) * time.Second,
+			KeepAlive: time.Duration(crawler.Timeout) * time.Second,
 		}).DialContext,
 		MaxIdleConns:        100, // Golang default is 100
 		MaxConnsPerHost:     1000,
-		IdleConnTimeout:     time.Duration(crawler.Options.Timeout) * time.Second,
-		TLSHandshakeTimeout: time.Duration(crawler.Options.Timeout) * time.Second,
+		IdleConnTimeout:     time.Duration(crawler.Timeout) * time.Second,
+		TLSHandshakeTimeout: time.Duration(crawler.Timeout) * time.Second,
 		TLSClientConfig: &tls.Config{
 			InsecureSkipVerify: true, //nolint:gosec // Intended
 			Renegotiation:      tls.RenegotiateOnceAsClient,
@@ -177,12 +191,12 @@ func New(options *Options) (crawler *Crawler, err error) {
 
 	// Proxies
 	// NOTE: Must come AFTER .SetClient calls
-	if len(crawler.Options.Proxies) > 0 {
+	if len(crawler.Proxies) > 0 {
 		var (
 			rrps colly.ProxyFunc
 		)
 
-		rrps, err = proxy.RoundRobinProxySwitcher(crawler.Options.Proxies...)
+		rrps, err = proxy.RoundRobinProxySwitcher(crawler.Proxies...)
 		if err != nil {
 			return
 		}
