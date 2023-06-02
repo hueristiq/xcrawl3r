@@ -1,12 +1,14 @@
 package xcrawl3r
 
 import (
+	"fmt"
 	"mime"
 	"path"
 	"strings"
 
 	"github.com/gocolly/colly/v2"
 	hqurl "github.com/hueristiq/hqgoutils/url"
+	"github.com/hueristiq/xcrawl3r/pkg/browser"
 )
 
 func (crawler *Crawler) pageCrawl(parsedURL *hqurl.URL) (URLsChannel chan URL) {
@@ -14,6 +16,21 @@ func (crawler *Crawler) pageCrawl(parsedURL *hqurl.URL) (URLsChannel chan URL) {
 
 	go func() {
 		defer close(URLsChannel)
+
+		if crawler.Render {
+			fmt.Println(crawler.Render)
+			// If we're using a proxy send it to the chrome instance
+			browser.GlobalContext, browser.GlobalCancel = browser.GetGlobalContext(crawler.Headless, strings.Join(crawler.Proxies, ","))
+
+			// Close the main tab when we end the main() function
+			defer browser.GlobalCancel()
+
+			// If renderJavascript, pass the response's body to the renderer and then replace the body for .OnHTML to handle.
+			crawler.PageCollector.OnResponse(func(request *colly.Response) {
+				html := browser.GetRenderedSource(request.Request.URL.String())
+				request.Body = []byte(html)
+			})
+		}
 
 		crawler.PageCollector.OnRequest(func(request *colly.Request) {
 			if match := crawler.URLsNotToRequestRegex.MatchString(request.URL.String()); match {

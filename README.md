@@ -23,6 +23,7 @@
 * Parses URLs from files (`.js`, `.json`, `.xml`, `.csv`, `.txt` & `.map`).
 * Parses URLs from `robots.txt`.
 * Parses URLs from sitemaps.
+* Renders pages (including Single Page Applications such as Angular and React).
 * Cross-Platform (Windows, Linux & macOS)
 
 ## Installation
@@ -124,36 +125,39 @@ USAGE:
   xcrawl3r [OPTIONS]
 
 INPUT:
-  -d, --domain string              domain to match URLs
-      --include-subdomains bool    match subdomains' URLs
-  -s, --seeds string               seed URLs file (use `-` to get from stdin)
-  -u, --url string                 URL to crawl
+  -d, --domain string               domain to match URLs
+      --include-subdomains bool     match subdomains' URLs
+  -s, --seeds string                seed URLs file (use `-` to get from stdin)
+  -u, --url string                  URL to crawl
 
 CONFIGURATION:
-      --depth int                  maximum depth to crawl (default 3)
+      --depth int                   maximum depth to crawl (default 3)
                                        TIP: set it to `0` for infinite recursion
-      --timeout int               time to wait for request in seconds (default: 10)
-  -H, --headers string[]          custom header to include in requests
+      --headless bool               If true the browser will be displayed while crawling.
+  -H, --headers string[]            custom header to include in requests
                                        e.g. -H 'Referer: http://example.com/'
                                        TIP: use multiple flag to set multiple headers
-      --user-agent string         User Agent to use (default: web)
+      --proxy string[]              Proxy URL (e.g: http://127.0.0.1:8080)
+                                       TIP: use multiple flag to set multiple proxies
+      --render bool                 utilize a headless chrome instance to render pages
+      --timeout int                 time to wait for request in seconds (default: 10)
+      --user-agent string           User Agent to use (default: web)
                                        TIP: use `web` for a random web user-agent,
                                        `mobile` for a random mobile user-agent,
                                         or you can set your specific user-agent.
-      --proxy string[]            Proxy URL (e.g: http://127.0.0.1:8080)
-                                       TIP: use multiple flag to set multiple proxies
 
 RATE LIMIT:
-  -c, --concurrency int           number of concurrent fetchers to use (default 10)
-  -p, --parallelism int           number of concurrent URLs to process (default: 10)
-      --delay int                 delay between each request in seconds
-      --max-random-delay int      maximux extra randomized delay added to `--dalay` (default: 1s)
+  -c, --concurrency int             number of concurrent fetchers to use (default 10)
+      --delay int                   delay between each request in seconds
+      --max-random-delay int        maximux extra randomized delay added to `--dalay` (default: 1s)
+  -p, --parallelism int             number of concurrent URLs to process (default: 10)
 
 OUTPUT:
-      --debug bool                 enable debug mode (default: false)
-  -m, --monochrome bool            coloring: no colored output mode
-  -o, --output string              output file to write found URLs
-  -v, --verbosity string           debug, info, warning, error, fatal or silent (default: debug)
+      --debug bool                  enable debug mode (default: false)
+  -m, --monochrome bool             coloring: no colored output mode
+  -o, --output string               output file to write found URLs
+  -v, --verbosity string            debug, info, warning, error, fatal or silent (default: debug)
+
 ```
 
 ## Contributing

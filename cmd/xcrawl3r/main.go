@@ -24,19 +24,24 @@ var (
 	includeSubdomains bool
 	seedsFile         string
 	URL               string
-	depth             int
-	timeout           int
-	headers           []string
-	userAgent         string
-	proxies           []string
-	concurrency       int
-	parallelism       int
-	delay             int
-	maxRandomDelay    int
-	debug             bool
-	monochrome        bool
-	output            string
-	verbosity         string
+
+	depth     int
+	headless  bool
+	headers   []string
+	proxies   []string
+	render    bool
+	timeout   int
+	userAgent string
+
+	concurrency    int
+	delay          int
+	maxRandomDelay int
+	parallelism    int
+
+	debug      bool
+	monochrome bool
+	output     string
+	verbosity  string
 )
 
 func init() {
@@ -45,15 +50,20 @@ func init() {
 	pflag.BoolVar(&includeSubdomains, "include-subdomains", false, "")
 	pflag.StringVarP(&seedsFile, "seeds", "s", "", "")
 	pflag.StringVarP(&URL, "url", "u", "", "")
+
 	pflag.IntVar(&depth, "depth", 3, "")
-	pflag.IntVar(&timeout, "timeout", 10, "")
+	pflag.BoolVar(&headless, "headless", false, "")
 	pflag.StringSliceVarP(&headers, "headers", "H", []string{}, "")
-	pflag.StringVar(&userAgent, "user-agent", "web", "")
 	pflag.StringSliceVar(&proxies, "proxy", []string{}, "")
+	pflag.BoolVar(&render, "render", false, "")
+	pflag.IntVar(&timeout, "timeout", 10, "")
+	pflag.StringVar(&userAgent, "user-agent", "web", "")
+
 	pflag.IntVarP(&concurrency, "concurrency", "c", 10, "")
-	pflag.IntVarP(&parallelism, "parallelism", "p", 10, "")
 	pflag.IntVar(&delay, "delay", 0, "")
 	pflag.IntVar(&maxRandomDelay, "max-random-delay", 1, "")
+	pflag.IntVarP(&parallelism, "parallelism", "p", 10, "")
+
 	pflag.BoolVar(&debug, "debug", false, "")
 	pflag.BoolVarP(&monochrome, "monochrome", "m", false, "")
 	pflag.StringVarP(&output, "output", "o", "", "")
@@ -67,37 +77,38 @@ func init() {
 		h += "  xcrawl3r [OPTIONS]\n"
 
 		h += "\nINPUT:\n"
-		h += "  -d, --domain string              domain to match URLs\n"
-		h += "      --include-subdomains bool    match subdomains' URLs\n"
-		h += "  -s, --seeds string               seed URLs file (use `-` to get from stdin)\n"
-		h += "  -u, --url string                 URL to crawl\n"
+		h += "  -d, --domain string               domain to match URLs\n"
+		h += "      --include-subdomains bool     match subdomains' URLs\n"
+		h += "  -s, --seeds string                seed URLs file (use `-` to get from stdin)\n"
+		h += "  -u, --url string                  URL to crawl\n"
 
 		h += "\nCONFIGURATION:\n"
-		h += "      --depth int                  maximum depth to crawl (default 3)\n"
+		h += "      --depth int                   maximum depth to crawl (default 3)\n"
 		h += "                                       TIP: set it to `0` for infinite recursion\n"
-		h += "      --timeout int               time to wait for request in seconds (default: 10)\n"
-		h += "  -H, --headers string[]          custom header to include in requests\n"
+		h += "      --headless bool               If true the browser will be displayed while crawling.\n"
+		h += "  -H, --headers string[]            custom header to include in requests\n"
 		h += "                                       e.g. -H 'Referer: http://example.com/'\n"
 		h += "                                       TIP: use multiple flag to set multiple headers\n"
-
-		h += "      --user-agent string         User Agent to use (default: web)\n"
+		h += "      --proxy string[]              Proxy URL (e.g: http://127.0.0.1:8080)\n"
+		h += "                                       TIP: use multiple flag to set multiple proxies\n"
+		h += "      --render bool                 utilize a headless chrome instance to render pages\n"
+		h += "      --timeout int                 time to wait for request in seconds (default: 10)\n"
+		h += "      --user-agent string           User Agent to use (default: web)\n"
 		h += "                                       TIP: use `web` for a random web user-agent,\n"
 		h += "                                       `mobile` for a random mobile user-agent,\n"
 		h += "                                        or you can set your specific user-agent.\n"
-		h += "      --proxy string[]            Proxy URL (e.g: http://127.0.0.1:8080)\n"
-		h += "                                       TIP: use multiple flag to set multiple proxies\n"
 
 		h += "\nRATE LIMIT:\n"
-		h += "  -c, --concurrency int           number of concurrent fetchers to use (default 10)\n"
-		h += "  -p, --parallelism int           number of concurrent URLs to process (default: 10)\n"
-		h += "      --delay int                 delay between each request in seconds\n"
-		h += "      --max-random-delay int      maximux extra randomized delay added to `--dalay` (default: 1s)\n"
+		h += "  -c, --concurrency int             number of concurrent fetchers to use (default 10)\n"
+		h += "      --delay int                   delay between each request in seconds\n"
+		h += "      --max-random-delay int        maximux extra randomized delay added to `--dalay` (default: 1s)\n"
+		h += "  -p, --parallelism int             number of concurrent URLs to process (default: 10)\n"
 
 		h += "\nOUTPUT:\n"
-		h += "      --debug bool                 enable debug mode (default: false)\n"
-		h += "  -m, --monochrome bool            coloring: no colored output mode\n"
-		h += "  -o, --output string              output file to write found URLs\n"
-		h += "  -v, --verbosity string           debug, info, warning, error, fatal or silent (default: debug)\n"
+		h += "      --debug bool                  enable debug mode (default: false)\n"
+		h += "  -m, --monochrome bool             coloring: no colored output mode\n"
+		h += "  -o, --output string               output file to write found URLs\n"
+		h += "  -v, --verbosity string            debug, info, warning, error, fatal or silent (default: debug)\n"
 
 		fmt.Fprint(os.Stderr, h)
 	}
@@ -185,16 +196,21 @@ func main() {
 		Domain:            parsedURL.Domain,
 		IncludeSubdomains: includeSubdomains,
 		Seeds:             seeds,
-		Parallelism:       parallelism,
-		Concurrency:       concurrency,
-		Debug:             debug,
-		Depth:             depth,
-		Headers:           headers,
-		Delay:             delay,
-		MaxRandomDelay:    maxRandomDelay,
-		Proxies:           proxies,
-		Timeout:           timeout,
-		UserAgent:         userAgent,
+
+		Depth:     depth,
+		Headless:  headless,
+		Headers:   headers,
+		Proxies:   proxies,
+		Render:    render,
+		Timeout:   timeout,
+		UserAgent: userAgent,
+
+		Concurrency:    concurrency,
+		Delay:          delay,
+		MaxRandomDelay: maxRandomDelay,
+		Parallelism:    parallelism,
+
+		Debug: debug,
 	}
 
 	crawler, err := xcrawl3r.New(options)
