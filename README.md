@@ -8,25 +8,27 @@
 
 * [Features](#features)
 * [Installation](#installation)
-	* [Install release binaries](#install-release-binaries)
-	* [Install source](#install-sources)
+	* [Install release binaries (Without Go Installed)](#install-release-binaries-without-go-installed)
+	* [Install source (With Go Installed)](#install-source-with-go-installed)
 		* [`go install ...`](#go-install)
 		* [`go build ...` the development Version](#go-build--the-development-version)
 * [Usage](#usage)
-* [Contribution](#contribution)
+* [Contributing](#contributing)
 * [Licensing](#licensing)
+* [Credits](#credits)
 
 ## Features
 
 * Recursively crawls webpages for URLs.
-* Parses files for URLs. (`.js`, `.json`, `.xml`, `.csv`, `.txt` & `.map`) 
-* Parses `robots.txt` for URLs.
-* Parses sitemaps for URLs.
-* Customizable Parallelism
+* Parses URLs from files (`.js`, `.json`, `.xml`, `.csv`, `.txt` & `.map`).
+* Parses URLs from `robots.txt`.
+* Parses URLs from sitemaps.
+* Renders pages (including Single Page Applications such as Angular and React).
+* Cross-Platform (Windows, Linux & macOS)
 
 ## Installation
 
-### Install release binaries
+### Install release binaries (Without Go Installed)
 
 Visit the [releases page](https://github.com/hueristiq/xcrawl3r/releases) and find the appropriate archive for your operating system and architecture. Download the archive from your browser or copy its URL and retrieve it with `wget` or `curl`:
 
@@ -64,7 +66,7 @@ sudo mv xcrawl3r /usr/local/bin/
 
 **NOTE:** Windows users can follow [How to: Add Tool Locations to the PATH Environment Variable](https://msdn.microsoft.com/en-us/library/office/ee537574(v=office.14).aspx) in order to add `xcrawl3r` to their `PATH`.
 
-### Install source
+### Install source (With Go Installed)
 
 Before you install from source, you need to make sure that Go is installed on your system. You can install Go by following the official instructions for your operating system. For this, we will assume that Go is already installed.
 
@@ -115,7 +117,7 @@ help message:
 __  _____ _ __ __ ___      _| |___ / _ __ 
 \ \/ / __| '__/ _` \ \ /\ / / | |_ \| '__|
  >  < (__| | | (_| |\ V  V /| |___) | |   
-/_/\_\___|_|  \__,_| \_/\_/ |_|____/|_| v0.0.0
+/_/\_\___|_|  \__,_| \_/\_/ |_|____/|_| v0.1.0
 
 A CLI utility to recursively crawl webpages.
 
@@ -123,42 +125,52 @@ USAGE:
   xcrawl3r [OPTIONS]
 
 INPUT:
-  -d, --domain string              domain to match URLs
-      --include-subdomains bool    match subdomains' URLs
-  -s, --seeds string               seed URLs file (use `-` to get from stdin)
-  -u, --url string                 URL to crawl
+  -d, --domain string               domain to match URLs
+      --include-subdomains bool     match subdomains' URLs
+  -s, --seeds string                seed URLs file (use `-` to get from stdin)
+  -u, --url string                  URL to crawl
 
 CONFIGURATION:
-      --depth int                  maximum depth to crawl (default 3)
+      --depth int                   maximum depth to crawl (default 3)
                                        TIP: set it to `0` for infinite recursion
-      --timeout int               time to wait for request in seconds (default: 10)
-  -H, --headers string[]          custom header to include in requests
+      --headless bool               If true the browser will be displayed while crawling.
+  -H, --headers string[]            custom header to include in requests
                                        e.g. -H 'Referer: http://example.com/'
                                        TIP: use multiple flag to set multiple headers
-      --user-agent string         User Agent to use (default: web)
+      --proxy string[]              Proxy URL (e.g: http://127.0.0.1:8080)
+                                       TIP: use multiple flag to set multiple proxies
+      --render bool                 utilize a headless chrome instance to render pages
+      --timeout int                 time to wait for request in seconds (default: 10)
+      --user-agent string           User Agent to use (default: web)
                                        TIP: use `web` for a random web user-agent,
                                        `mobile` for a random mobile user-agent,
                                         or you can set your specific user-agent.
-      --proxy string[]            Proxy URL (e.g: http://127.0.0.1:8080)
-                                       TIP: use multiple flag to set multiple proxies
 
 RATE LIMIT:
-  -c, --concurrency int           number of concurrent fetchers to use (default 10)
-  -p, --parallelism int           number of concurrent URLs to process (default: 10)
-      --delay int                 delay between each request in seconds
-      --max-random-delay int      maximux extra randomized delay added to `--dalay` (default: 1s)
+  -c, --concurrency int             number of concurrent fetchers to use (default 10)
+      --delay int                   delay between each request in seconds
+      --max-random-delay int        maximux extra randomized delay added to `--dalay` (default: 1s)
+  -p, --parallelism int             number of concurrent URLs to process (default: 10)
 
 OUTPUT:
-      --debug bool                 enable debug mode (default: false)
-  -m, --monochrome bool            coloring: no colored output mode
-  -o, --output string              output file to write found URLs
-  -v, --verbosity string           debug, info, warning, error, fatal or silent (default: debug)
+      --debug bool                  enable debug mode (default: false)
+  -m, --monochrome bool             coloring: no colored output mode
+  -o, --output string               output file to write found URLs
+  -v, --verbosity string            debug, info, warning, error, fatal or silent (default: debug)
+
 ```
 
 ## Contributing
 
-[Issues](https://github.com/hueristiq/xcrawl3r/issues) and [Pull Requests](https://github.com/hueristiq/xcrawl3r/pulls) are welcome! Check out the [contribution guidelines](./CONTRIBUTING.md).
+[Issues](https://github.com/hueristiq/xcrawl3r/issues) and [Pull Requests](https://github.com/hueristiq/xcrawl3r/pulls) are welcome! **Check out the [contribution guidelines](./CONTRIBUTING.md).**
 
 ## Licensing
 
 This utility is distributed under the [MIT license](./LICENSE).
+
+
+## Credits
+
+* Alternatives - Check out projects below, that may fit in your workflow:
+
+	[katana](https://github.com/projectdiscovery/katana) ◇ [gospider](https://github.com/jaeles-project/gospider) ◇ [hakrawler](https://github.com/hakluke/hakrawler) ◇ [urlgrab](https://github.com/IAmStoxe/urlgrab)

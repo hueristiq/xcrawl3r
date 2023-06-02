@@ -21,32 +21,43 @@ type Options struct { //nolint:govet // To be refactored
 	Domain            string
 	IncludeSubdomains bool
 	Seeds             []string
-	Concurrency       int
-	Parallelism       int
-	Debug             bool
-	Delay             int
-	Depth             int
-	Headers           []string
-	MaxRandomDelay    int // seconds
-	Proxies           []string
-	RenderTimeout     int // seconds
-	Timeout           int // seconds
-	UserAgent         string
+
+	Depth     int
+	Headless  bool
+	Headers   []string
+	Proxies   []string
+	Render    bool
+	Timeout   int // seconds
+	UserAgent string
+
+	Concurrency    int
+	Delay          int // seconds
+	MaxRandomDelay int // seconds
+	Parallelism    int
+
+	Debug bool
 }
 
 type Crawler struct { //nolint:govet // To be refactored
-	Domain                string
-	IncludeSubdomains     bool
-	Seeds                 []string
-	Concurrency           int
-	Parallelism           int
-	Depth                 int
-	Timeout               int
-	MaxRandomDelay        int
-	Debug                 bool
-	Headers               []string
-	UserAgent             string
-	Proxies               []string
+	Domain            string
+	IncludeSubdomains bool
+	Seeds             []string
+
+	Depth     int
+	Headless  bool
+	Headers   []string
+	Proxies   []string
+	Render    bool
+	Timeout   int
+	UserAgent string
+
+	Concurrency    int
+	Delay          int
+	MaxRandomDelay int
+	Parallelism    int
+
+	Debug bool
+
 	PageCollector         *colly.Collector
 	FileURLsRegex         *regexp.Regexp
 	FileCollector         *colly.Collector
@@ -59,15 +70,21 @@ func New(options *Options) (crawler *Crawler, err error) {
 		Domain:            options.Domain,
 		IncludeSubdomains: options.IncludeSubdomains,
 		Seeds:             options.Seeds,
-		Concurrency:       options.Concurrency,
-		Parallelism:       options.Parallelism,
-		Depth:             options.Depth,
-		Timeout:           options.Timeout,
-		MaxRandomDelay:    options.MaxRandomDelay,
-		Debug:             options.Debug,
-		Headers:           options.Headers,
-		UserAgent:         options.UserAgent,
-		Proxies:           options.Proxies,
+
+		Depth:     options.Depth,
+		Headless:  options.Headless,
+		Headers:   options.Headers,
+		Proxies:   options.Proxies,
+		Render:    options.Render,
+		Timeout:   options.Timeout,
+		UserAgent: options.UserAgent,
+
+		Concurrency:    options.Concurrency,
+		Delay:          options.Delay,
+		MaxRandomDelay: options.MaxRandomDelay,
+		Parallelism:    options.Parallelism,
+
+		Debug: options.Debug,
 	}
 
 	crawler.URLsRegex = regexp.MustCompile(`(?:"|')(((?:[a-zA-Z]{1,10}://|//)[^"'/]{1,}\.[a-zA-Z]{2,}[^"']{0,})|((?:/|\.\./|\./)[^"'><,;| *()(%%$^/\\\[\]][^"'><,;|()]{1,})|([a-zA-Z0-9_\-/]{1,}/[a-zA-Z0-9_\-/]{1,}\.(?:[a-zA-Z]{1,4}|action)(?:[\?|#][^"|']{0,}|))|([a-zA-Z0-9_\-/]{1,}/[a-zA-Z0-9_\-/]{3,}(?:[\?|#][^"|']{0,}|))|([a-zA-Z0-9_\-]{1,}\.(?:php|asp|aspx|jsp|json|action|html|js|txt|xml)(?:[\?|#][^"|']{0,}|)))(?:"|')`) //nolint:gocritic // Works fine!
