@@ -8,25 +8,26 @@
 
 * [Features](#features)
 * [Installation](#installation)
-	* [Install release binaries](#install-release-binaries)
-	* [Install source](#install-sources)
+	* [Install release binaries (Without Go Installed)](#install-release-binaries-without-go-installed)
+	* [Install source (With Go Installed)](#install-source-with-go-installed)
 		* [`go install ...`](#go-install)
 		* [`go build ...` the development Version](#go-build--the-development-version)
 * [Usage](#usage)
-* [Contribution](#contribution)
+* [Contributing](#contributing)
 * [Licensing](#licensing)
+* [Credits](#credits)
 
 ## Features
 
 * Recursively crawls webpages for URLs.
-* Parses files for URLs. (`.js`, `.json`, `.xml`, `.csv`, `.txt` & `.map`) 
-* Parses `robots.txt` for URLs.
-* Parses sitemaps for URLs.
-* Customizable Parallelism
+* Parses URLs from files (`.js`, `.json`, `.xml`, `.csv`, `.txt` & `.map`).
+* Parses URLs from `robots.txt`.
+* Parses URLs from sitemaps.
+* Cross-Platform (Windows, Linux & macOS)
 
 ## Installation
 
-### Install release binaries
+### Install release binaries (Without Go Installed)
 
 Visit the [releases page](https://github.com/hueristiq/xcrawl3r/releases) and find the appropriate archive for your operating system and architecture. Download the archive from your browser or copy its URL and retrieve it with `wget` or `curl`:
 
@@ -64,7 +65,7 @@ sudo mv xcrawl3r /usr/local/bin/
 
 **NOTE:** Windows users can follow [How to: Add Tool Locations to the PATH Environment Variable](https://msdn.microsoft.com/en-us/library/office/ee537574(v=office.14).aspx) in order to add `xcrawl3r` to their `PATH`.
 
-### Install source
+### Install source (With Go Installed)
 
 Before you install from source, you need to make sure that Go is installed on your system. You can install Go by following the official instructions for your operating system. For this, we will assume that Go is already installed.
 
@@ -157,8 +158,15 @@ OUTPUT:
 
 ## Contributing
 
-[Issues](https://github.com/hueristiq/xcrawl3r/issues) and [Pull Requests](https://github.com/hueristiq/xcrawl3r/pulls) are welcome! Check out the [contribution guidelines](./CONTRIBUTING.md).
+[Issues](https://github.com/hueristiq/xcrawl3r/issues) and [Pull Requests](https://github.com/hueristiq/xcrawl3r/pulls) are welcome! **Check out the [contribution guidelines](./CONTRIBUTING.md).**
 
 ## Licensing
 
 This utility is distributed under the [MIT license](./LICENSE).
+
+
+## Credits
+
+* Alternatives - Check out projects below, that may fit in your workflow:
+
+	[katana](https://github.com/projectdiscovery/katana) ◇ [gospider](https://github.com/jaeles-project/gospider) ◇ [hakrawler](https://github.com/hakluke/hakrawler) ◇ [urlgrab](https://github.com/IAmStoxe/urlgrab)
