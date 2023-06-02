@@ -4,7 +4,7 @@ import "github.com/logrusorgru/aurora/v3"
 
 const (
 	NAME        string = "xcrawl3r"
-	VERSION     string = "0.0.0"
+	VERSION     string = "0.1.0"
 	DESCRIPTION string = "A CLI utility to recursively crawl webpages."
 )
 
