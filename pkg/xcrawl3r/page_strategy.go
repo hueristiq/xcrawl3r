@@ -1,7 +1,6 @@
 package xcrawl3r
 
 import (
-	"fmt"
 	"mime"
 	"path"
 	"strings"
@@ -18,7 +17,6 @@ func (crawler *Crawler) pageCrawl(parsedURL *hqurl.URL) (URLsChannel chan URL) {
 		defer close(URLsChannel)
 
 		if crawler.Render {
-			fmt.Println(crawler.Render)
 			// If we're using a proxy send it to the chrome instance
 			browser.GlobalContext, browser.GlobalCancel = browser.GetGlobalContext(crawler.Headless, strings.Join(crawler.Proxies, ","))
 

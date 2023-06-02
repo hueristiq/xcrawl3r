@@ -2,16 +2,16 @@ package browser
 
 import (
 	"context"
-	// "urlgrab/utilities"
+	"log"
 
 	"github.com/chromedp/chromedp"
+	hqlog "github.com/hueristiq/hqgoutils/log"
 )
 
 var GlobalContext context.Context
 var GlobalCancel context.CancelFunc
 
-func GetRenderedSource(url string) string {
-
+func GetRenderedSource(url string) (outerHTML string) {
 	// same browser, second tab
 	newCtx, newCtxCancel := chromedp.NewContext(GlobalContext)
 	defer newCtxCancel()
@@ -19,57 +19,41 @@ func GetRenderedSource(url string) string {
 	// ensure the second tab is created
 	if err := chromedp.Run(newCtx); err != nil {
 		newCtxCancel()
-		// utilities.Logger.Fatal(err)
+		hqlog.Fatal().Msg(err.Error())
 	}
 
 	// navigate to a page, and get it's entire HTML
-	var outerHtml string
-
 	if err := chromedp.Run(newCtx,
 		chromedp.Navigate(url),
-		chromedp.OuterHTML("html", &outerHtml),
+		chromedp.OuterHTML("html", &outerHTML),
 	); err != nil {
-		// utilities.Logger.Error(err)
+		hqlog.Error().Msg(err.Error())
 	}
 
-	return outerHtml
+	return
 }
 
-func GetGlobalContext(headless bool, proxy string) (context.Context, context.CancelFunc) {
-	var (
-		allocCtx context.Context
-		cancel   context.CancelFunc
+func GetGlobalContext(headless bool, proxy string) (ctx context.Context, cancel context.CancelFunc) {
+	opts := append(chromedp.DefaultExecAllocatorOptions[:],
+		chromedp.Flag("headless", headless),
+		chromedp.Flag("ignore-certificate-errors", true),
+		chromedp.Flag("disable-extensions", true),
+		chromedp.Flag("no-first-run", true),
+		chromedp.Flag("no-default-browser-check", true),
 	)
-	if proxy == "" {
-		allocCtx, cancel = chromedp.NewExecAllocator(context.Background(),
-			chromedp.Flag("headless", headless),
-			chromedp.Flag("ignore-certificate-errors", true),
-			chromedp.Flag("disable-extensions", true),
-			chromedp.Flag("no-first-run", true),
-			chromedp.Flag("no-default-browser-check", true),
-		)
-	} else {
-		allocCtx, cancel = chromedp.NewExecAllocator(context.Background(),
-			chromedp.Flag("headless", headless),
-			chromedp.Flag("ignore-certificate-errors", true),
-			chromedp.Flag("disable-extensions", true),
-			chromedp.Flag("no-first-run", true),
-			chromedp.Flag("no-default-browser-check", true),
-			chromedp.Flag("no-default-browser-check", true),
-			chromedp.Flag("proxy-server", proxy),
-		)
+
+	if proxy != "" {
+		opts = append(opts, chromedp.Flag("proxy-server", proxy))
 	}
 
-	// create chrome instance
-	ctx, cancel := chromedp.NewContext(allocCtx,
-		// chromedp.WithErrorf(utilities.Logger.Errorf),
-		chromedp.WithBrowserOption(),
-	)
+	allocCtx, _ := chromedp.NewExecAllocator(context.Background(), opts...)
+
+	ctx, cancel = chromedp.NewContext(allocCtx, chromedp.WithLogf(log.Printf), chromedp.WithBrowserOption())
 
 	// ensure the first tab is created
 	if err := chromedp.Run(ctx); err != nil {
-		// utilities.Logger.Fatal(err)
+		hqlog.Fatal().Msg(err.Error())
 	}
 
-	return ctx, cancel
+	return
 }
