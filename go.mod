@@ -3,7 +3,7 @@ module github.com/hueristiq/xcrawl3r
 go 1.20
 
 require (
-	github.com/chromedp/chromedp v0.9.1
+	github.com/chromedp/chromedp v0.9.2
 	github.com/gocolly/colly/v2 v2.1.0
 	github.com/hueristiq/hqgoutils v0.0.0-20230520130214-98e4015932b8
 	github.com/logrusorgru/aurora/v3 v3.0.0
@@ -17,12 +17,12 @@ require (
 	github.com/antchfx/htmlquery v1.2.3 // indirect
 	github.com/antchfx/xmlquery v1.2.4 // indirect
 	github.com/antchfx/xpath v1.1.8 // indirect
-	github.com/chromedp/cdproto v0.0.0-20230220211738-2b1ec77315c9 // indirect
+	github.com/chromedp/cdproto v0.0.0-20230802225258-3cf4e6d46a89 // indirect
 	github.com/chromedp/sysutil v1.0.0 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/gobwas/httphead v0.1.0 // indirect
 	github.com/gobwas/pool v0.2.1 // indirect
-	github.com/gobwas/ws v1.1.0 // indirect
+	github.com/gobwas/ws v1.2.1 // indirect
 	github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e // indirect
 	github.com/golang/protobuf v1.4.2 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
