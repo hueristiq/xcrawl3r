@@ -3,11 +3,11 @@ package xcrawl3r
 import (
 	"fmt"
 
-	hqurl "github.com/hueristiq/hqgoutils/url"
+	"github.com/hueristiq/hqgourl"
 	sitemap "github.com/oxffaa/gopher-parse-sitemap"
 )
 
-func (crawler *Crawler) sitemapParsing(parsedURL *hqurl.URL) (URLsChannel chan URL) {
+func (crawler *Crawler) sitemapParsing(parsedURL *hqgourl.URL) (URLsChannel chan URL) {
 	URLsChannel = make(chan URL)
 
 	go func() {

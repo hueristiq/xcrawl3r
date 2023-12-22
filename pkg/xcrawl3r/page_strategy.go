@@ -6,11 +6,11 @@ import (
 	"strings"
 
 	"github.com/gocolly/colly/v2"
-	hqurl "github.com/hueristiq/hqgoutils/url"
+	"github.com/hueristiq/hqgourl"
 	"github.com/hueristiq/xcrawl3r/pkg/browser"
 )
 
-func (crawler *Crawler) pageCrawl(parsedURL *hqurl.URL) (URLsChannel chan URL) {
+func (crawler *Crawler) pageCrawl(parsedURL *hqgourl.URL) (URLsChannel chan URL) {
 	URLsChannel = make(chan URL)
 
 	go func() {
@@ -48,11 +48,17 @@ func (crawler *Crawler) pageCrawl(parsedURL *hqurl.URL) (URLsChannel chan URL) {
 			}
 		})
 
+		crawler.FileCollector.OnError(func(_ *colly.Response, err error) {
+		})
+
+		crawler.FileCollector.OnResponse(func(response *colly.Response) {
+		})
+
 		crawler.PageCollector.OnHTML("[href]", func(e *colly.HTMLElement) {
 			relativeURL := e.Attr("href")
 			absoluteURL := e.Request.AbsoluteURL(relativeURL)
 
-			parsedAbsoluteURL, err := hqurl.Parse(absoluteURL)
+			parsedAbsoluteURL, err := hqgourl.Parse(absoluteURL)
 			if err != nil {
 				return
 			}
@@ -112,9 +118,7 @@ func (crawler *Crawler) pageCrawl(parsedURL *hqurl.URL) (URLsChannel chan URL) {
 			body := decode(string(response.Body))
 			URLs := crawler.URLsRegex.FindAllString(body, -1)
 
-			for index := range URLs {
-				fileURL := URLs[index]
-
+			for _, fileURL := range URLs {
 				// remove beginning and ending quotes
 				fileURL = strings.Trim(fileURL, "\"")
 				fileURL = strings.Trim(fileURL, "'")

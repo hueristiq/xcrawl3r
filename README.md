@@ -1,8 +1,8 @@
 # xcrawl3r
 
-![made with go](https://img.shields.io/badge/made%20with-Go-0000FF.svg) [![release](https://img.shields.io/github/release/hueristiq/xcrawl3r?style=flat&color=0000FF)](https://github.com/hueristiq/xcrawl3r/releases) [![license](https://img.shields.io/badge/license-MIT-gray.svg?color=0000FF)](https://github.com/hueristiq/xcrawl3r/blob/master/LICENSE) ![maintenance](https://img.shields.io/badge/maintained%3F-yes-0000FF.svg) [![open issues](https://img.shields.io/github/issues-raw/hueristiq/xcrawl3r.svg?style=flat&color=0000FF)](https://github.com/hueristiq/xcrawl3r/issues?q=is:issue+is:open) [![closed issues](https://img.shields.io/github/issues-closed-raw/hueristiq/xcrawl3r.svg?style=flat&color=0000FF)](https://github.com/hueristiq/xcrawl3r/issues?q=is:issue+is:closed) [![contribution](https://img.shields.io/badge/contributions-welcome-0000FF.svg)](https://github.com/hueristiq/xcrawl3r/blob/master/CONTRIBUTING.md)
+![made with go](https://img.shields.io/badge/made%20with-Go-1E90FF.svg) [![go report card](https://goreportcard.com/badge/github.com/hueristiq/xcrawl3r)](https://goreportcard.com/report/github.com/hueristiq/xcrawl3r) [![release](https://img.shields.io/github/release/hueristiq/xcrawl3r?style=flat&color=1E90FF)](https://github.com/hueristiq/xcrawl3r/releases) [![open issues](https://img.shields.io/github/issues-raw/hueristiq/xcrawl3r.svg?style=flat&color=1E90FF)](https://github.com/hueristiq/xcrawl3r/issues?q=is:issue+is:open) [![closed issues](https://img.shields.io/github/issues-closed-raw/hueristiq/xcrawl3r.svg?style=flat&color=1E90FF)](https://github.com/hueristiq/xcrawl3r/issues?q=is:issue+is:closed) [![license](https://img.shields.io/badge/license-MIT-gray.svg?color=1E90FF)](https://github.com/hueristiq/xcrawl3r/blob/master/LICENSE) ![maintenance](https://img.shields.io/badge/maintained%3F-yes-1E90FF.svg) [![contribution](https://img.shields.io/badge/contributions-welcome-1E90FF.svg)](https://github.com/hueristiq/xcrawl3r/blob/master/CONTRIBUTING.md)
 
-`xcrawl3r` is a command-line interface (CLI) utility to recursively crawl webpages i.e systematically browse webpages' URLs and follow links to discover linked webpages' URLs.
+`xcrawl3r` is a command-line interface (CLI) based utility to recursively crawl webpages. It is designed to systematically browse webpages' URLs and follow links to discover linked webpages' URLs.
 
 ## Resources
 
@@ -16,6 +16,8 @@
 * [Contributing](#contributing)
 * [Licensing](#licensing)
 * [Credits](#credits)
+    * [Contributors](#contributors)
+    * [Similar Projects](#similar-projects)
 
 ## Features
 
@@ -50,13 +52,15 @@ Visit the [releases page](https://github.com/hueristiq/xcrawl3r/releases) and fi
 tar xf xcrawl3r-<version>-linux-amd64.tar.gz
 ```
 
-> **TIP:** The above steps, download and extract, can be combined into a single step with this onliner
+> [!TIP]
+> The above steps, download and extract, can be combined into a single step with this onliner
 > 
 > ```bash
 > curl -sL https://github.com/hueristiq/xcrawl3r/releases/download/v<version>/xcrawl3r-<version>-linux-amd64.tar.gz | tar -xzv
 > ```
 
-**NOTE:** On Windows systems, you should be able to double-click the zip archive to extract the `xcrawl3r` executable.
+> [!NOTE]
+> On Windows systems, you should be able to double-click the zip archive to extract the `xcrawl3r` executable.
 
 ...move the `xcrawl3r` binary to somewhere in your `PATH`. For example, on GNU/Linux and OS X systems:
 
@@ -64,7 +68,8 @@ tar xf xcrawl3r-<version>-linux-amd64.tar.gz
 sudo mv xcrawl3r /usr/local/bin/
 ```
 
-**NOTE:** Windows users can follow [How to: Add Tool Locations to the PATH Environment Variable](https://msdn.microsoft.com/en-us/library/office/ee537574(v=office.14).aspx) in order to add `xcrawl3r` to their `PATH`.
+> [!NOTE]
+> Windows users can follow [How to: Add Tool Locations to the PATH Environment Variable](https://msdn.microsoft.com/en-us/library/office/ee537574(v=office.14).aspx) in order to add `xcrawl3r` to their `PATH`.
 
 ### Install source (With Go Installed)
 
@@ -96,11 +101,12 @@ go install -v github.com/hueristiq/xcrawl3r/cmd/xcrawl3r@latest
 	```bash
 	sudo mv xcrawl3r /usr/local/bin/
 	```
+	> [!NOTE]
+	> Windows users can follow [How to: Add Tool Locations to the PATH Environment Variable](https://msdn.microsoft.com/en-us/library/office/ee537574(v=office.14).aspx) in order to add `xcrawl3r` to their `PATH`.
 
-	**NOTE:** Windows users can follow [How to: Add Tool Locations to the PATH Environment Variable](https://msdn.microsoft.com/en-us/library/office/ee537574(v=office.14).aspx) in order to add `xcrawl3r` to their `PATH`.
 
-
-**NOTE:** While the development version is a good way to take a peek at `xcrawl3r`'s latest features before they get released, be aware that it may have bugs. Officially released versions will generally be more stable.
+> [!CAUTION]
+> While the development version is a good way to take a peek at `xcrawl3r`'s latest features before they get released, be aware that it may have bugs. Officially released versions will generally be more stable.
 
 ## Usage
 
@@ -162,15 +168,22 @@ OUTPUT:
 
 ## Contributing
 
-[Issues](https://github.com/hueristiq/xcrawl3r/issues) and [Pull Requests](https://github.com/hueristiq/xcrawl3r/pulls) are welcome! **Check out the [contribution guidelines](./CONTRIBUTING.md).**
+[Issues](https://github.com/hueristiq/xcrawl3r/issues) and [Pull Requests](https://github.com/hueristiq/xcrawl3r/pulls) are welcome! **Check out the [contribution guidelines](https://github.com/hueristiq/xcrawl3r/blob/master/CONTRIBUTING.md).**
 
 ## Licensing
 
-This utility is distributed under the [MIT license](./LICENSE).
-
+This utility is distributed under the [MIT license](https://github.com/hueristiq/xcrawl3r/blob/master/LICENSE).
 
 ## Credits
 
-* Alternatives - Check out projects below, that may fit in your workflow:
+### Contributors
 
-	[katana](https://github.com/projectdiscovery/katana) ◇ [gospider](https://github.com/jaeles-project/gospider) ◇ [hakrawler](https://github.com/hakluke/hakrawler) ◇ [urlgrab](https://github.com/IAmStoxe/urlgrab)
+Thanks to the amazing [contributors](https://github.com/hueristiq/xcrawl3r/graphs/contributors) for keeping this project alive.
+
+[![contributors](https://contrib.rocks/image?repo=hueristiq/xcrawl3r&max=500)](https://github.com/hueristiq/xcrawl3r/graphs/contributors)
+
+### Similar Projects
+
+Thanks to similar open source projects - check them out, may fit in your workflow.
+
+[katana](https://github.com/projectdiscovery/katana) ◇ [gospider](https://github.com/jaeles-project/gospider) ◇ [hakrawler](https://github.com/hakluke/hakrawler) ◇ [urlgrab](https://github.com/IAmStoxe/urlgrab)

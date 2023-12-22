@@ -3,7 +3,7 @@ package xcrawl3r
 import (
 	"strings"
 
-	hqurl "github.com/hueristiq/hqgoutils/url"
+	"github.com/hueristiq/hqgourl"
 )
 
 func decode(source string) (decodedSource string) {
@@ -17,10 +17,10 @@ func decode(source string) (decodedSource string) {
 	return
 }
 
-func (crawler *Crawler) fixURL(parsedURL *hqurl.URL, URL string) (fixedURL string) {
+func (crawler *Crawler) fixURL(parsedURL *hqgourl.URL, URL string) (fixedURL string) {
 	// decode
 	// this ....
-	if strings.HasPrefix(URL, "http") { //nolint:gocritic // Works!
+	if strings.HasPrefix(URL, "http") {
 		// `http://google.com` OR `https://google.com`
 		fixedURL = URL
 	} else if strings.HasPrefix(URL, "//") {
@@ -50,7 +50,7 @@ func (crawler *Crawler) fixURL(parsedURL *hqurl.URL, URL string) (fixedURL strin
 }
 
 func (crawler *Crawler) IsInScope(URL string) (isInScope bool) {
-	parsedURL, err := hqurl.Parse(URL)
+	parsedURL, err := hqgourl.Parse(URL)
 	if err != nil {
 		return
 	}

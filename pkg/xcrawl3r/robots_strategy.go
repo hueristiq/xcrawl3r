@@ -3,14 +3,15 @@ package xcrawl3r
 import (
 	"fmt"
 	"io"
-	"net/http"
 	"regexp"
 	"strings"
 
-	hqurl "github.com/hueristiq/hqgoutils/url"
+	"github.com/hueristiq/hqgohttp"
+	"github.com/hueristiq/hqgohttp/status"
+	"github.com/hueristiq/hqgourl"
 )
 
-func (crawler *Crawler) robotsParsing(parsedURL *hqurl.URL) (URLsChannel chan URL) {
+func (crawler *Crawler) robotsParsing(parsedURL *hqgourl.URL) (URLsChannel chan URL) {
 	URLsChannel = make(chan URL)
 
 	go func() {
@@ -18,14 +19,14 @@ func (crawler *Crawler) robotsParsing(parsedURL *hqurl.URL) (URLsChannel chan UR
 
 		robotsURL := fmt.Sprintf("%s://%s/robots.txt", parsedURL.Scheme, parsedURL.Host)
 
-		res, err := http.Get(robotsURL) //nolint:gosec // Works!
+		res, err := hqgohttp.Get(robotsURL)
 		if err != nil {
 			return
 		}
 
 		defer res.Body.Close()
 
-		if res.StatusCode == 200 {
+		if res.StatusCode == status.OK {
 			URLsChannel <- URL{Source: "known", Value: robotsURL}
 
 			body, err := io.ReadAll(res.Body)

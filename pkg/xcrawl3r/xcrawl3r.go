@@ -14,10 +14,11 @@ import (
 	"github.com/gocolly/colly/v2/debug"
 	"github.com/gocolly/colly/v2/extensions"
 	"github.com/gocolly/colly/v2/proxy"
-	hqurl "github.com/hueristiq/hqgoutils/url"
+	"github.com/hueristiq/hqgourl"
+	"github.com/hueristiq/xcrawl3r/internal/configuration"
 )
 
-type Options struct { //nolint:govet // To be refactored
+type Options struct {
 	Domain            string
 	IncludeSubdomains bool
 	Seeds             []string
@@ -38,7 +39,7 @@ type Options struct { //nolint:govet // To be refactored
 	Debug bool
 }
 
-type Crawler struct { //nolint:govet // To be refactored
+type Crawler struct {
 	Domain            string
 	IncludeSubdomains bool
 	Seeds             []string
@@ -65,6 +66,8 @@ type Crawler struct { //nolint:govet // To be refactored
 	URLsRegex             *regexp.Regexp
 }
 
+var DefaultUserAgent = fmt.Sprintf("%s v%s (https://github.com/hueristiq/%s)", configuration.NAME, configuration.VERSION, configuration.NAME)
+
 func New(options *Options) (crawler *Crawler, err error) {
 	crawler = &Crawler{
 		Domain:            options.Domain,
@@ -89,7 +92,7 @@ func New(options *Options) (crawler *Crawler, err error) {
 
 	crawler.URLsRegex = regexp.MustCompile(`(?:"|')(((?:[a-zA-Z]{1,10}://|//)[^"'/]{1,}\.[a-zA-Z]{2,}[^"']{0,})|((?:/|\.\./|\./)[^"'><,;| *()(%%$^/\\\[\]][^"'><,;|()]{1,})|([a-zA-Z0-9_\-/]{1,}/[a-zA-Z0-9_\-/]{1,}\.(?:[a-zA-Z]{1,4}|action)(?:[\?|#][^"|']{0,}|))|([a-zA-Z0-9_\-/]{1,}/[a-zA-Z0-9_\-/]{3,}(?:[\?|#][^"|']{0,}|))|([a-zA-Z0-9_\-]{1,}\.(?:php|asp|aspx|jsp|json|action|html|js|txt|xml)(?:[\?|#][^"|']{0,}|)))(?:"|')`) //nolint:gocritic // Works fine!
 
-	crawler.FileURLsRegex = regexp.MustCompile(`(?m).*?\.*(js|json|xml|csv|txt|map)(\?.*?|)$`) //nolint:gocritic // Works fine!
+	crawler.FileURLsRegex = regexp.MustCompile(`(?m).*?\.*(js|json|xml|csv|txt|map)(\?.*?|)$`)
 
 	crawler.URLsNotToRequestRegex = regexp.MustCompile(`(?i)\.(apng|bpm|png|bmp|gif|heif|ico|cur|jpg|jpeg|jfif|pjp|pjpeg|psd|raw|svg|tif|tiff|webp|xbm|3gp|aac|flac|mpg|mpeg|mp3|mp4|m4a|m4v|m4p|oga|ogg|ogv|mov|wav|webm|eot|woff|woff2|ttf|otf|css)(?:\?|#|$)`)
 
@@ -132,7 +135,7 @@ func New(options *Options) (crawler *Crawler, err error) {
 
 				var splitEntry []string
 
-				if strings.Contains(entry, ": ") { //nolint:gocritic // Works!
+				if strings.Contains(entry, ": ") {
 					splitEntry = strings.SplitN(entry, ": ", 2)
 				} else if strings.Contains(entry, ":") {
 					splitEntry = strings.SplitN(entry, ":", 2)
@@ -150,13 +153,17 @@ func New(options *Options) (crawler *Crawler, err error) {
 
 	extensions.Referer(crawler.PageCollector)
 
-	switch ua := strings.ToLower(crawler.UserAgent); {
-	case strings.HasPrefix(ua, "mob"):
-		extensions.RandomMobileUserAgent(crawler.PageCollector)
-	case strings.HasPrefix(ua, "web"):
-		extensions.RandomUserAgent(crawler.PageCollector)
-	default:
-		crawler.PageCollector.UserAgent = crawler.UserAgent
+	if crawler.UserAgent == "" {
+		crawler.PageCollector.UserAgent = DefaultUserAgent
+	} else {
+		switch ua := strings.ToLower(crawler.UserAgent); {
+		case strings.HasPrefix(ua, "mob"):
+			extensions.RandomMobileUserAgent(crawler.PageCollector)
+		case strings.HasPrefix(ua, "web"):
+			extensions.RandomUserAgent(crawler.PageCollector)
+		default:
+			crawler.PageCollector.UserAgent = crawler.UserAgent
+		}
 	}
 
 	HTTPTransport := &http.Transport{
@@ -169,7 +176,7 @@ func New(options *Options) (crawler *Crawler, err error) {
 		IdleConnTimeout:     time.Duration(crawler.Timeout) * time.Second,
 		TLSHandshakeTimeout: time.Duration(crawler.Timeout) * time.Second,
 		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: true, //nolint:gosec // Intended
+			InsecureSkipVerify: true,
 			Renegotiation:      tls.RenegotiateOnceAsClient,
 		},
 	}
@@ -179,16 +186,14 @@ func New(options *Options) (crawler *Crawler, err error) {
 		CheckRedirect: func(req *http.Request, via []*http.Request) (err error) {
 			nextLocation := req.Response.Header.Get("Location")
 
-			var parsedLocation *hqurl.URL
+			var parsedLocation *hqgourl.URL
 
-			parsedLocation, err = hqurl.Parse(nextLocation)
+			parsedLocation, err = hqgourl.Parse(nextLocation)
 			if err != nil {
 				return err
 			}
 
-			if crawler.IncludeSubdomains &&
-				(parsedLocation.Domain == crawler.Domain ||
-					strings.HasSuffix(parsedLocation.Domain, "."+crawler.Domain)) {
+			if crawler.IncludeSubdomains && (parsedLocation.Domain == crawler.Domain || strings.HasSuffix(parsedLocation.Domain, "."+crawler.Domain)) {
 				return nil
 			}
 
@@ -254,7 +259,7 @@ func (crawler *Crawler) Crawl() (URLsChannel chan URL) {
 				defer URLsWG.Done()
 
 				for seed := range seedsChannel {
-					parsedSeed, err := hqurl.Parse(seed)
+					parsedSeed, err := hqgourl.Parse(seed)
 					if err != nil {
 						continue
 					}

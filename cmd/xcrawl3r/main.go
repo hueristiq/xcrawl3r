@@ -7,10 +7,10 @@ import (
 	"os"
 	"path/filepath"
 
-	hqlog "github.com/hueristiq/hqgoutils/log"
-	"github.com/hueristiq/hqgoutils/log/formatter"
-	"github.com/hueristiq/hqgoutils/log/levels"
-	hqurl "github.com/hueristiq/hqgoutils/url"
+	"github.com/hueristiq/hqgolog"
+	"github.com/hueristiq/hqgolog/formatter"
+	"github.com/hueristiq/hqgolog/levels"
+	"github.com/hueristiq/hqgourl"
 	"github.com/hueristiq/xcrawl3r/internal/configuration"
 	"github.com/hueristiq/xcrawl3r/pkg/xcrawl3r"
 	"github.com/logrusorgru/aurora/v3"
@@ -57,7 +57,7 @@ func init() {
 	pflag.StringSliceVar(&proxies, "proxy", []string{}, "")
 	pflag.BoolVar(&render, "render", false, "")
 	pflag.IntVar(&timeout, "timeout", 10, "")
-	pflag.StringVar(&userAgent, "user-agent", "web", "")
+	pflag.StringVar(&userAgent, "user-agent", xcrawl3r.DefaultUserAgent, "")
 
 	pflag.IntVarP(&concurrency, "concurrency", "c", 10, "")
 	pflag.IntVar(&delay, "delay", 0, "")
@@ -73,42 +73,42 @@ func init() {
 	pflag.Usage = func() {
 		fmt.Fprintln(os.Stderr, configuration.BANNER)
 
-		h := "USAGE:\n"
+		h := "\nUSAGE:\n"
 		h += "  xcrawl3r [OPTIONS]\n"
 
 		h += "\nINPUT:\n"
-		h += "  -d, --domain string               domain to match URLs\n"
-		h += "      --include-subdomains bool     match subdomains' URLs\n"
-		h += "  -s, --seeds string                seed URLs file (use `-` to get from stdin)\n"
-		h += "  -u, --url string                  URL to crawl\n"
+		h += " -d, --domain string               domain to match URLs\n"
+		h += "     --include-subdomains bool     match subdomains' URLs\n"
+		h += " -s, --seeds string                seed URLs file (use `-` to get from stdin)\n"
+		h += " -u, --url string                  URL to crawl\n"
 
 		h += "\nCONFIGURATION:\n"
-		h += "      --depth int                   maximum depth to crawl (default 3)\n"
-		h += "                                       TIP: set it to `0` for infinite recursion\n"
-		h += "      --headless bool               If true the browser will be displayed while crawling.\n"
-		h += "  -H, --headers string[]            custom header to include in requests\n"
-		h += "                                       e.g. -H 'Referer: http://example.com/'\n"
-		h += "                                       TIP: use multiple flag to set multiple headers\n"
-		h += "      --proxy string[]              Proxy URL (e.g: http://127.0.0.1:8080)\n"
-		h += "                                       TIP: use multiple flag to set multiple proxies\n"
-		h += "      --render bool                 utilize a headless chrome instance to render pages\n"
-		h += "      --timeout int                 time to wait for request in seconds (default: 10)\n"
-		h += "      --user-agent string           User Agent to use (default: web)\n"
-		h += "                                       TIP: use `web` for a random web user-agent,\n"
-		h += "                                       `mobile` for a random mobile user-agent,\n"
-		h += "                                        or you can set your specific user-agent.\n"
+		h += "     --depth int                   maximum depth to crawl (default 3)\n"
+		h += "                                      TIP: set it to `0` for infinite recursion\n"
+		h += "     --headless bool               If true the browser will be displayed while crawling.\n"
+		h += " -H, --headers string[]            custom header to include in requests\n"
+		h += "                                      e.g. -H 'Referer: http://example.com/'\n"
+		h += "                                      TIP: use multiple flag to set multiple headers\n"
+		h += "     --proxy string[]              Proxy URL (e.g: http://127.0.0.1:8080)\n"
+		h += "                                      TIP: use multiple flag to set multiple proxies\n"
+		h += "     --render bool                 utilize a headless chrome instance to render pages\n"
+		h += "     --timeout int                 time to wait for request in seconds (default: 10)\n"
+		h += fmt.Sprintf("     --user-agent string           User Agent to use (default: %s)\n", xcrawl3r.DefaultUserAgent)
+		h += "                                      TIP: use `web` for a random web user-agent,\n"
+		h += "                                      `mobile` for a random mobile user-agent,\n"
+		h += "                                       or you can set your specific user-agent.\n"
 
 		h += "\nRATE LIMIT:\n"
-		h += "  -c, --concurrency int             number of concurrent fetchers to use (default 10)\n"
-		h += "      --delay int                   delay between each request in seconds\n"
-		h += "      --max-random-delay int        maximux extra randomized delay added to `--dalay` (default: 1s)\n"
-		h += "  -p, --parallelism int             number of concurrent URLs to process (default: 10)\n"
+		h += " -c, --concurrency int             number of concurrent fetchers to use (default 10)\n"
+		h += "     --delay int                   delay between each request in seconds\n"
+		h += "     --max-random-delay int        maximux extra randomized delay added to `--dalay` (default: 1s)\n"
+		h += " -p, --parallelism int             number of concurrent URLs to process (default: 10)\n"
 
 		h += "\nOUTPUT:\n"
-		h += "      --debug bool                  enable debug mode (default: false)\n"
-		h += "  -m, --monochrome bool             coloring: no colored output mode\n"
-		h += "  -o, --output string               output file to write found URLs\n"
-		h += "  -v, --verbosity string            debug, info, warning, error, fatal or silent (default: debug)\n"
+		h += "     --debug bool                  enable debug mode (default: false)\n"
+		h += " -m, --monochrome bool             coloring: no colored output mode\n"
+		h += " -o, --output string               output file to write found URLs\n"
+		h += " -v, --verbosity string            debug, info, warning, error, fatal or silent (default: debug)\n"
 
 		fmt.Fprint(os.Stderr, h)
 	}
@@ -116,8 +116,8 @@ func init() {
 	pflag.Parse()
 
 	// Initialize logger
-	hqlog.DefaultLogger.SetMaxLevel(levels.LevelStr(verbosity))
-	hqlog.DefaultLogger.SetFormatter(formatter.NewCLI(&formatter.CLIOptions{
+	hqgolog.DefaultLogger.SetMaxLevel(levels.LevelStr(verbosity))
+	hqgolog.DefaultLogger.SetFormatter(formatter.NewCLI(&formatter.CLIOptions{
 		Colorize: !monochrome,
 	}))
 
@@ -130,7 +130,7 @@ func main() {
 	}
 
 	if seedsFile != "" && URL == "" && domain == "" {
-		hqlog.Fatal().Msg("using `-s, --seeds` requires either `-d, --domain` or `-u, --url` to be set!")
+		hqgolog.Fatal().Msg("using `-s, --seeds` requires either `-d, --domain` or `-u, --url` to be set!")
 	}
 
 	// Load input URLs
@@ -155,21 +155,21 @@ func main() {
 		case seedsFile != "" && seedsFile == "-":
 			stat, err = os.Stdin.Stat()
 			if err != nil {
-				hqlog.Fatal().Msg("no stdin")
+				hqgolog.Fatal().Msg("no stdin")
 			}
 
 			if stat.Mode()&os.ModeNamedPipe == 0 {
-				hqlog.Fatal().Msg("no stdin")
+				hqgolog.Fatal().Msg("no stdin")
 			}
 
 			file = os.Stdin
 		case seedsFile != "" && seedsFile != "-":
 			file, err = os.Open(seedsFile)
 			if err != nil {
-				hqlog.Fatal().Msg(err.Error())
+				hqgolog.Fatal().Msg(err.Error())
 			}
 		default:
-			hqlog.Fatal().Msg("xcrawl3r takes input from stdin or file using a flag")
+			hqgolog.Fatal().Msg("xcrawl3r takes input from stdin or file using a flag")
 		}
 
 		scanner := bufio.NewScanner(file)
@@ -183,13 +183,13 @@ func main() {
 		}
 
 		if scanner.Err() != nil {
-			hqlog.Fatal().Msgf("%s", err)
+			hqgolog.Fatal().Msgf("%s", err)
 		}
 	}
 
-	parsedURL, err := hqurl.Parse(domain)
+	parsedURL, err := hqgourl.Parse(domain)
 	if err != nil {
-		hqlog.Fatal().Msgf("%s", err)
+		hqgolog.Fatal().Msgf("%s", err)
 	}
 
 	options := &xcrawl3r.Options{
@@ -215,7 +215,7 @@ func main() {
 
 	crawler, err := xcrawl3r.New(options)
 	if err != nil {
-		hqlog.Fatal().Msgf("%s", err)
+		hqgolog.Fatal().Msgf("%s", err)
 	}
 
 	URLs := crawler.Crawl()
@@ -225,13 +225,13 @@ func main() {
 
 		if _, err := os.Stat(directory); os.IsNotExist(err) {
 			if err = os.MkdirAll(directory, os.ModePerm); err != nil {
-				hqlog.Fatal().Msg(err.Error())
+				hqgolog.Fatal().Msg(err.Error())
 			}
 		}
 
-		file, err := os.OpenFile(output, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		file, err := os.OpenFile(output, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 		if err != nil {
-			hqlog.Fatal().Msg(err.Error())
+			hqgolog.Fatal().Msg(err.Error())
 		}
 
 		defer file.Close()
@@ -240,23 +240,23 @@ func main() {
 
 		for outputURL := range URLs {
 			if verbosity == string(levels.LevelSilent) {
-				hqlog.Print().Msg(outputURL.Value)
+				hqgolog.Print().Msg(outputURL.Value)
 			} else {
-				hqlog.Print().Msgf("[%s] %s", au.BrightBlue(outputURL.Source), outputURL.Value)
+				hqgolog.Print().Msgf("[%s] %s", au.BrightBlue(outputURL.Source), outputURL.Value)
 			}
 
 			fmt.Fprintln(writer, outputURL.Value)
 		}
 
 		if err = writer.Flush(); err != nil {
-			hqlog.Fatal().Msg(err.Error())
+			hqgolog.Fatal().Msg(err.Error())
 		}
 	} else {
 		for outputURL := range URLs {
 			if verbosity == string(levels.LevelSilent) {
-				hqlog.Print().Msg(outputURL.Value)
+				hqgolog.Print().Msg(outputURL.Value)
 			} else {
-				hqlog.Print().Msgf("[%s] %s", au.BrightBlue(outputURL.Source), outputURL.Value)
+				hqgolog.Print().Msgf("[%s] %s", au.BrightBlue(outputURL.Source), outputURL.Value)
 			}
 		}
 	}
