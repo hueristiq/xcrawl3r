@@ -14,9 +14,6 @@ __  _____ _ __ __ ___      _| |___ / _ __
 \ \/ / __| '__/ _`+"`"+` \ \ /\ / / | |_ \| '__|
  >  < (__| | | (_| |\ V  V /| |___) | |   
 /_/\_\___|_|  \__,_| \_/\_/ |_|____/|_| 
-                                    %s
-
-          %s`).Bold(),
+                                    %s`).Bold(),
 	aurora.BrightRed("v"+VERSION).Bold(),
-	aurora.BrightYellow("with <3 by Hueristiq Open Source").Italic(),
 )

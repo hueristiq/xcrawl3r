@@ -12,12 +12,13 @@
 	* [Install source (With Go Installed)](#install-source-with-go-installed)
 		* [`go install ...`](#go-install)
 		* [`go build ...` the development Version](#go-build--the-development-version)
+	* [Install on Docker (With Docker Installed)](#install-on-docker-with-docker-installed)
 * [Usage](#usage)
 * [Contributing](#contributing)
 * [Licensing](#licensing)
 * [Credits](#credits)
-    * [Contributors](#contributors)
-    * [Similar Projects](#similar-projects)
+	* [Contributors](#contributors)
+	* [Similar Projects](#similar-projects)
 
 ## Features
 
@@ -108,15 +109,31 @@ go install -v github.com/hueristiq/xcrawl3r/cmd/xcrawl3r@latest
 > [!CAUTION]
 > While the development version is a good way to take a peek at `xcrawl3r`'s latest features before they get released, be aware that it may have bugs. Officially released versions will generally be more stable.
 
+### Install on Docker (With Docker Installed)
+
+To install `xcrawl3r` on docker:
+
+* Pull the docker image using:
+
+    ```bash
+    docker pull hueristiq/xcrawl3r:latest
+    ```
+
+* Run `xcrawl3r` using the image:
+
+    ```bash
+    docker run --rm hueristiq/xcrawl3r:latest -h
+    ```
+
 ## Usage
 
-To display help message for `xcrawl3r` use the `-h` flag:
+To start using `xcrawl3r`, open your terminal and run the following command for a list of options:
 
 ```bash
 xcrawl3r -h
 ```
 
-help message:
+Here's what the help message looks like:
 
 ```text
                              _ _____      
@@ -168,22 +185,22 @@ OUTPUT:
 
 ## Contributing
 
-[Issues](https://github.com/hueristiq/xcrawl3r/issues) and [Pull Requests](https://github.com/hueristiq/xcrawl3r/pulls) are welcome! **Check out the [contribution guidelines](https://github.com/hueristiq/xcrawl3r/blob/master/CONTRIBUTING.md).**
+We welcome contributions! Feel free to submit [Pull Requests](https://github.com/hueristiq/xcrawl3r/pulls) or report [Issues](https://github.com/hueristiq/xcrawl3r/issues). For more details, check out the [contribution guidelines](https://github.com/hueristiq/xcrawl3r/blob/master/CONTRIBUTING.md).
 
 ## Licensing
 
-This utility is distributed under the [MIT license](https://github.com/hueristiq/xcrawl3r/blob/master/LICENSE).
+This utility is licensed under the [MIT license](https://opensource.org/license/mit). You are free to use, modify, and distribute it, as long as you follow the terms of the license. You can find the full license text in the repository - [Full MIT license text](https://github.com/hueristiq/xcrawl3r/blob/master/LICENSE).
 
 ## Credits
 
 ### Contributors
 
-Thanks to the amazing [contributors](https://github.com/hueristiq/xcrawl3r/graphs/contributors) for keeping this project alive.
+A huge thanks to all the contributors who have helped make `xcrawl3r` what it is today!
 
 [![contributors](https://contrib.rocks/image?repo=hueristiq/xcrawl3r&max=500)](https://github.com/hueristiq/xcrawl3r/graphs/contributors)
 
 ### Similar Projects
 
-Thanks to similar open source projects - check them out, may fit in your workflow.
+If you're interested in more utilities like this, check out:
 
-[katana](https://github.com/projectdiscovery/katana) ◇ [gospider](https://github.com/jaeles-project/gospider) ◇ [hakrawler](https://github.com/hakluke/hakrawler) ◇ [urlgrab](https://github.com/IAmStoxe/urlgrab)
+[gospider](https://github.com/jaeles-project/gospider) ◇ [hakrawler](https://github.com/hakluke/hakrawler) ◇ [katana](https://github.com/projectdiscovery/katana) ◇ [urlgrab](https://github.com/IAmStoxe/urlgrab)

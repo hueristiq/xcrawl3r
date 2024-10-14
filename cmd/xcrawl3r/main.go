@@ -6,11 +6,12 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 
+	hqgourl "github.com/hueristiq/hq-go-url"
 	"github.com/hueristiq/hqgolog"
 	"github.com/hueristiq/hqgolog/formatter"
 	"github.com/hueristiq/hqgolog/levels"
-	"github.com/hueristiq/hqgourl"
 	"github.com/hueristiq/xcrawl3r/internal/configuration"
 	"github.com/hueristiq/xcrawl3r/pkg/xcrawl3r"
 	"github.com/logrusorgru/aurora/v3"
@@ -41,7 +42,9 @@ var (
 	debug      bool
 	monochrome bool
 	output     string
-	verbosity  string
+
+	silent  bool
+	verbose bool
 )
 
 func init() {
@@ -67,7 +70,9 @@ func init() {
 	pflag.BoolVar(&debug, "debug", false, "")
 	pflag.BoolVarP(&monochrome, "monochrome", "m", false, "")
 	pflag.StringVarP(&output, "output", "o", "", "")
-	pflag.StringVarP(&verbosity, "verbosity", "v", string(levels.LevelInfo), "")
+
+	pflag.BoolVar(&silent, "silent", false, "")
+	pflag.BoolVarP(&verbose, "verbose", "v", false, "")
 
 	pflag.CommandLine.SortFlags = false
 	pflag.Usage = func() {
@@ -108,7 +113,8 @@ func init() {
 		h += "     --debug bool                  enable debug mode (default: false)\n"
 		h += " -m, --monochrome bool             coloring: no colored output mode\n"
 		h += " -o, --output string               output file to write found URLs\n"
-		h += " -v, --verbosity string            debug, info, warning, error, fatal or silent (default: debug)\n"
+		h += "     --silent bool                 display output URLs only\n"
+		h += " -v, --verbose bool                display verbose output\n"
 
 		fmt.Fprint(os.Stderr, h)
 	}
@@ -116,7 +122,12 @@ func init() {
 	pflag.Parse()
 
 	// Initialize logger
-	hqgolog.DefaultLogger.SetMaxLevel(levels.LevelStr(verbosity))
+	hqgolog.DefaultLogger.SetMaxLevel(levels.LevelInfo)
+
+	if verbose {
+		hqgolog.DefaultLogger.SetMaxLevel(levels.LevelDebug)
+	}
+
 	hqgolog.DefaultLogger.SetFormatter(formatter.NewCLI(&formatter.CLIOptions{
 		Colorize: !monochrome,
 	}))
@@ -125,13 +136,17 @@ func init() {
 }
 
 func main() {
-	if verbosity != string(levels.LevelSilent) {
+	if !silent {
 		fmt.Fprintln(os.Stderr, configuration.BANNER)
 	}
+
+	hqgolog.Print().Msg("")
 
 	if seedsFile != "" && URL == "" && domain == "" {
 		hqgolog.Fatal().Msg("using `-s, --seeds` requires either `-d, --domain` or `-u, --url` to be set!")
 	}
+
+	up := hqgourl.NewParser()
 
 	// Load input URLs
 	seeds := []string{}
@@ -140,7 +155,13 @@ func main() {
 		seeds = append(seeds, URL)
 
 		if domain == "" {
-			domain = URL
+			parsed, err := up.Parse(URL)
+			if err != nil {
+				hqgolog.Fatal().Msg(err.Error())
+			}
+
+			domain = parsed.Domain.String()
+			domain = strings.TrimPrefix(domain, "www.")
 		}
 	}
 
@@ -187,13 +208,8 @@ func main() {
 		}
 	}
 
-	parsedURL, err := hqgourl.Parse(domain)
-	if err != nil {
-		hqgolog.Fatal().Msgf("%s", err)
-	}
-
-	options := &xcrawl3r.Options{
-		Domain:            parsedURL.Domain,
+	cfg := &xcrawl3r.Configuration{
+		Domain:            domain,
 		IncludeSubdomains: includeSubdomains,
 		Seeds:             seeds,
 
@@ -213,12 +229,12 @@ func main() {
 		Debug: debug,
 	}
 
-	crawler, err := xcrawl3r.New(options)
+	crawler, err := xcrawl3r.New(cfg)
 	if err != nil {
-		hqgolog.Fatal().Msgf("%s", err)
+		hqgolog.Fatal().Msg(err.Error())
 	}
 
-	URLs := crawler.Crawl()
+	var writer *bufio.Writer
 
 	if output != "" {
 		directory := filepath.Dir(output)
@@ -229,34 +245,37 @@ func main() {
 			}
 		}
 
-		file, err := os.OpenFile(output, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+		var file *os.File
+
+		file, err = os.OpenFile(output, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 		if err != nil {
 			hqgolog.Fatal().Msg(err.Error())
 		}
 
 		defer file.Close()
 
-		writer := bufio.NewWriter(file)
+		writer = bufio.NewWriter(file)
+	}
 
-		for outputURL := range URLs {
-			if verbosity == string(levels.LevelSilent) {
-				hqgolog.Print().Msg(outputURL.Value)
+	for URL := range crawler.Crawl() {
+		switch URL.Type {
+		case xcrawl3r.ResultError:
+			if verbose {
+				hqgolog.Error().Msgf("%s: %s\n", URL.Source, URL.Error)
+			}
+		case xcrawl3r.ResultURL:
+			if verbose {
+				hqgolog.Print().Msgf("[%s] %s", au.BrightBlue(URL.Source), URL.Value)
 			} else {
-				hqgolog.Print().Msgf("[%s] %s", au.BrightBlue(outputURL.Source), outputURL.Value)
+				hqgolog.Print().Msg(URL.Value)
 			}
 
-			fmt.Fprintln(writer, outputURL.Value)
-		}
+			if writer != nil {
+				fmt.Fprintln(writer, URL.Value)
 
-		if err = writer.Flush(); err != nil {
-			hqgolog.Fatal().Msg(err.Error())
-		}
-	} else {
-		for outputURL := range URLs {
-			if verbosity == string(levels.LevelSilent) {
-				hqgolog.Print().Msg(outputURL.Value)
-			} else {
-				hqgolog.Print().Msgf("[%s] %s", au.BrightBlue(outputURL.Source), outputURL.Value)
+				if err := writer.Flush(); err != nil {
+					hqgolog.Fatal().Msg(err.Error())
+				}
 			}
 		}
 	}

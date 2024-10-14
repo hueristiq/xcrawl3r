@@ -3,7 +3,7 @@ package xcrawl3r
 import (
 	"strings"
 
-	"github.com/hueristiq/hqgourl"
+	hqgourl "github.com/hueristiq/hq-go-url"
 )
 
 func decode(source string) (decodedSource string) {
@@ -50,15 +50,19 @@ func (crawler *Crawler) fixURL(parsedURL *hqgourl.URL, URL string) (fixedURL str
 }
 
 func (crawler *Crawler) IsInScope(URL string) (isInScope bool) {
-	parsedURL, err := hqgourl.Parse(URL)
+	parsedURL, err := up.Parse(URL)
 	if err != nil {
 		return
 	}
 
+	if parsedURL.Domain == nil {
+		return
+	}
+
 	if crawler.IncludeSubdomains {
-		isInScope = parsedURL.Domain == crawler.Domain || strings.HasSuffix(parsedURL.Domain, "."+crawler.Domain)
+		isInScope = parsedURL.Domain.String() == crawler.Domain || strings.HasSuffix(parsedURL.Domain.String(), "."+crawler.Domain)
 	} else {
-		isInScope = parsedURL.Domain == crawler.Domain || parsedURL.Domain == "www."+crawler.Domain
+		isInScope = parsedURL.Domain.String() == crawler.Domain || parsedURL.Domain.String() == "www."+crawler.Domain
 	}
 
 	return
