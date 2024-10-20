@@ -4,7 +4,7 @@ import "github.com/logrusorgru/aurora/v3"
 
 const (
 	NAME    = "xcrawl3r"
-	VERSION = "0.1.0"
+	VERSION = "0.2.0"
 )
 
 var BANNER = aurora.Sprintf(

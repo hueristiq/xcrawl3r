@@ -142,7 +142,7 @@ __  _____ _ __ __ ___      _| |___ / _ __
 \ \/ / __| '__/ _` \ \ /\ / / | |_ \| '__|
  >  < (__| | | (_| |\ V  V /| |___) | |
 /_/\_\___|_|  \__,_| \_/\_/ |_|____/|_|
-                                    v0.1.0
+                                    v0.2.0
 
 USAGE:
   xcrawl3r [OPTIONS]
@@ -164,7 +164,7 @@ CONFIGURATION:
                                       TIP: use multiple flag to set multiple proxies
      --render bool                 utilize a headless chrome instance to render pages
      --timeout int                 time to wait for request in seconds (default: 10)
-     --user-agent string           User Agent to use (default: xcrawl3r v0.1.0 (https://github.com/hueristiq/xcrawl3r))
+     --user-agent string           User Agent to use (default: xcrawl3r v0.2.0 (https://github.com/hueristiq/xcrawl3r))
                                       TIP: use `web` for a random web user-agent,
                                       `mobile` for a random mobile user-agent,
                                        or you can set your specific user-agent.
