@@ -2,16 +2,18 @@ package xcrawl3r
 
 import (
 	"fmt"
+	"net/http"
 
-	hqurl "github.com/hueristiq/hqgoutils/url"
-	sitemap "github.com/oxffaa/gopher-parse-sitemap"
+	hqgohttp "github.com/hueristiq/hq-go-http"
+	hqgourl "github.com/hueristiq/hq-go-url"
+	sitemap "github.com/hueristiq/xcrawl3r/pkg/parser/sitemap"
 )
 
-func (crawler *Crawler) sitemapParsing(parsedURL *hqurl.URL) (URLsChannel chan URL) {
-	URLsChannel = make(chan URL)
+func (crawler *Crawler) sitemapParsing(parsedURL *hqgourl.URL) <-chan Result {
+	results := make(chan Result)
 
 	go func() {
-		defer close(URLsChannel)
+		defer close(results)
 
 		sitemapPaths := []string{
 			"/sitemap.xml",
@@ -31,24 +33,74 @@ func (crawler *Crawler) sitemapParsing(parsedURL *hqurl.URL) (URLsChannel chan U
 		for _, path := range sitemapPaths {
 			sitemapURL := fmt.Sprintf("%s://%s%s", parsedURL.Scheme, parsedURL.Host, path)
 
-			err := sitemap.ParseFromSite(sitemapURL, func(entry sitemap.Entry) (err error) {
-				smURL := entry.GetLocation()
-
-				URLsChannel <- URL{Source: "sitemap", Value: smURL}
-
-				if err = crawler.PageCollector.Visit(smURL); err != nil {
-					return
+			if err := crawler.parseSitemap(sitemapURL, results); err != nil {
+				result := Result{
+					Type:   ResultError,
+					Source: "known:sitemap",
+					Error:  err,
 				}
 
-				return
-			})
-			if err != nil {
+				results <- result
+
 				continue
 			}
 
-			URLsChannel <- URL{Source: "known", Value: sitemapURL}
+			result := Result{
+				Type:   ResultURL,
+				Source: "known:sitemap",
+				Value:  sitemapURL,
+			}
+
+			results <- result
 		}
 	}()
+
+	return results
+}
+
+func (crawler *Crawler) parseSitemap(URL string, results chan Result) (err error) {
+	var res *http.Response
+
+	res, err = hqgohttp.Get(URL)
+	if err != nil {
+		return
+	}
+
+	if err = sitemap.Parse(res.Body, func(entry sitemap.Entry) (err error) {
+		sitemapEntryURL := entry.GetLocation()
+
+		result := Result{
+			Type:   ResultURL,
+			Source: "sitemap",
+			Value:  sitemapEntryURL,
+		}
+
+		results <- result
+
+		if entry.GetType() == sitemap.EntryTypeSitemap {
+			return crawler.parseSitemap(sitemapEntryURL, results)
+		}
+
+		if err = crawler.PageCollector.Visit(sitemapEntryURL); err != nil {
+			result := Result{
+				Type:   ResultError,
+				Source: "sitemap",
+				Error:  err,
+			}
+
+			results <- result
+
+			err = nil
+
+			return
+		}
+
+		return
+	}); err != nil {
+		return
+	}
+
+	res.Body.Close()
 
 	return
 }

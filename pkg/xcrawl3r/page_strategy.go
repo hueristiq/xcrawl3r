@@ -6,15 +6,15 @@ import (
 	"strings"
 
 	"github.com/gocolly/colly/v2"
-	hqurl "github.com/hueristiq/hqgoutils/url"
+	hqgourl "github.com/hueristiq/hq-go-url"
 	"github.com/hueristiq/xcrawl3r/pkg/browser"
 )
 
-func (crawler *Crawler) pageCrawl(parsedURL *hqurl.URL) (URLsChannel chan URL) {
-	URLsChannel = make(chan URL)
+func (crawler *Crawler) pageCrawl(parsedURL *hqgourl.URL) <-chan Result {
+	results := make(chan Result)
 
 	go func() {
-		defer close(URLsChannel)
+		defer close(results)
 
 		if crawler.Render {
 			// If we're using a proxy send it to the chrome instance
@@ -26,6 +26,7 @@ func (crawler *Crawler) pageCrawl(parsedURL *hqurl.URL) (URLsChannel chan URL) {
 			// If renderJavascript, pass the response's body to the renderer and then replace the body for .OnHTML to handle.
 			crawler.PageCollector.OnResponse(func(request *colly.Response) {
 				html := browser.GetRenderedSource(request.Request.URL.String())
+
 				request.Body = []byte(html)
 			})
 		}
@@ -48,11 +49,21 @@ func (crawler *Crawler) pageCrawl(parsedURL *hqurl.URL) (URLsChannel chan URL) {
 			}
 		})
 
+		crawler.FileCollector.OnError(func(_ *colly.Response, err error) {
+			result := Result{
+				Type:   ResultError,
+				Source: "page",
+				Error:  err,
+			}
+
+			results <- result
+		})
+
 		crawler.PageCollector.OnHTML("[href]", func(e *colly.HTMLElement) {
 			relativeURL := e.Attr("href")
 			absoluteURL := e.Request.AbsoluteURL(relativeURL)
 
-			parsedAbsoluteURL, err := hqurl.Parse(absoluteURL)
+			parsedAbsoluteURL, err := up.Parse(absoluteURL)
 			if err != nil {
 				return
 			}
@@ -66,9 +77,23 @@ func (crawler *Crawler) pageCrawl(parsedURL *hqurl.URL) (URLsChannel chan URL) {
 				return
 			}
 
-			URLsChannel <- URL{Source: "page:href", Value: absoluteURL}
+			result := Result{
+				Type:   ResultURL,
+				Source: "page:href",
+				Value:  absoluteURL,
+			}
+
+			results <- result
 
 			if err = e.Request.Visit(absoluteURL); err != nil {
+				result := Result{
+					Type:   ResultError,
+					Source: "page:href",
+					Error:  err,
+				}
+
+				results <- result
+
 				return
 			}
 		})
@@ -81,10 +106,24 @@ func (crawler *Crawler) pageCrawl(parsedURL *hqurl.URL) (URLsChannel chan URL) {
 				return
 			}
 
-			URLsChannel <- URL{Source: "page:src", Value: absoluteURL}
+			result := Result{
+				Type:   ResultURL,
+				Source: "page:src",
+				Value:  absoluteURL,
+			}
+
+			results <- result
 
 			if match := crawler.FileURLsRegex.MatchString(absoluteURL); match {
 				if err := crawler.FileCollector.Visit(absoluteURL); err != nil {
+					result := Result{
+						Type:   ResultError,
+						Source: "page:src",
+						Error:  err,
+					}
+
+					results <- result
+
 					return
 				}
 
@@ -92,6 +131,14 @@ func (crawler *Crawler) pageCrawl(parsedURL *hqurl.URL) (URLsChannel chan URL) {
 			}
 
 			if err := e.Request.Visit(absoluteURL); err != nil {
+				result := Result{
+					Type:   ResultError,
+					Source: "page:src",
+					Error:  err,
+				}
+
+				results <- result
+
 				return
 			}
 		})
@@ -112,9 +159,7 @@ func (crawler *Crawler) pageCrawl(parsedURL *hqurl.URL) (URLsChannel chan URL) {
 			body := decode(string(response.Body))
 			URLs := crawler.URLsRegex.FindAllString(body, -1)
 
-			for index := range URLs {
-				fileURL := URLs[index]
-
+			for _, fileURL := range URLs {
 				// remove beginning and ending quotes
 				fileURL = strings.Trim(fileURL, "\"")
 				fileURL = strings.Trim(fileURL, "'")
@@ -137,15 +182,37 @@ func (crawler *Crawler) pageCrawl(parsedURL *hqurl.URL) (URLsChannel chan URL) {
 					continue
 				}
 
-				URLsChannel <- URL{Source: "file:" + ext, Value: fileURL}
+				result := Result{
+					Type:   ResultURL,
+					Source: "file:" + ext,
+					Value:  fileURL,
+				}
+
+				results <- result
 
 				if err := crawler.PageCollector.Visit(fileURL); err != nil {
+					result := Result{
+						Type:   ResultError,
+						Source: "file:" + ext,
+						Error:  err,
+					}
+
+					results <- result
+
 					return
 				}
 			}
 		})
 
 		if err := crawler.PageCollector.Visit(parsedURL.String()); err != nil {
+			result := Result{
+				Type:   ResultError,
+				Source: "page",
+				Error:  err,
+			}
+
+			results <- result
+
 			return
 		}
 
@@ -153,5 +220,5 @@ func (crawler *Crawler) pageCrawl(parsedURL *hqurl.URL) (URLsChannel chan URL) {
 		crawler.FileCollector.Wait()
 	}()
 
-	return
+	return results
 }

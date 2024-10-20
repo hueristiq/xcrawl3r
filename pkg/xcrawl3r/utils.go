@@ -3,7 +3,7 @@ package xcrawl3r
 import (
 	"strings"
 
-	hqurl "github.com/hueristiq/hqgoutils/url"
+	hqgourl "github.com/hueristiq/hq-go-url"
 )
 
 func decode(source string) (decodedSource string) {
@@ -17,10 +17,10 @@ func decode(source string) (decodedSource string) {
 	return
 }
 
-func (crawler *Crawler) fixURL(parsedURL *hqurl.URL, URL string) (fixedURL string) {
+func (crawler *Crawler) fixURL(parsedURL *hqgourl.URL, URL string) (fixedURL string) {
 	// decode
 	// this ....
-	if strings.HasPrefix(URL, "http") { //nolint:gocritic // Works!
+	if strings.HasPrefix(URL, "http") {
 		// `http://google.com` OR `https://google.com`
 		fixedURL = URL
 	} else if strings.HasPrefix(URL, "//") {
@@ -50,15 +50,19 @@ func (crawler *Crawler) fixURL(parsedURL *hqurl.URL, URL string) (fixedURL strin
 }
 
 func (crawler *Crawler) IsInScope(URL string) (isInScope bool) {
-	parsedURL, err := hqurl.Parse(URL)
+	parsedURL, err := up.Parse(URL)
 	if err != nil {
 		return
 	}
 
+	if parsedURL.Domain == nil {
+		return
+	}
+
 	if crawler.IncludeSubdomains {
-		isInScope = parsedURL.Domain == crawler.Domain || strings.HasSuffix(parsedURL.Domain, "."+crawler.Domain)
+		isInScope = parsedURL.Domain.String() == crawler.Domain || strings.HasSuffix(parsedURL.Domain.String(), "."+crawler.Domain)
 	} else {
-		isInScope = parsedURL.Domain == crawler.Domain || parsedURL.Domain == "www."+crawler.Domain
+		isInScope = parsedURL.Domain.String() == crawler.Domain || parsedURL.Domain.String() == "www."+crawler.Domain
 	}
 
 	return

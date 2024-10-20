@@ -41,14 +41,14 @@ Pull requests should target the `dev` branch. Please also reference the issue fr
 
 When submitting code, please make every effort to follow existing conventions and style in order to keep the code as readable as possible. Here are a few points to keep in mind:
 
-* Please run `go fmt ./...` before committing to ensure code aligns with go standards.
-* We use [`golangci-lint`](https://golangci-lint.run/) for linting Go code, run `golangci-lint run --fix` before submitting PR. Editors such as Visual Studio Code or JetBrains IntelliJ; with Go support plugin will offer `golangci-lint` automatically.
 * All dependencies must be defined in the `go.mod` file.
 	* Advanced IDEs and code editors (like VSCode) will take care of that, but to be sure, run `go mod tidy` to validate dependencies.
+* Please run `go fmt ./...` before committing to ensure code aligns with go standards.
+* We use [`golangci-lint`](https://golangci-lint.run/) for linting Go code, run `golangci-lint run --fix` before submitting PR. Editors such as Visual Studio Code or JetBrains IntelliJ; with Go support plugin will offer `golangci-lint` automatically.
 * For details on the approved style, check out [Effective Go](https://golang.org/doc/effective_go.html).
 
 ### License
 
-By contributing your code, you agree to license your contribution under the terms of the [MIT License](./LICENSE).
+By contributing your code, you agree to license your contribution under the terms of the [MIT License](https://github.com/hueristiq/xcrawl3r/blob/master/LICENSE).
 
 All files are released with the MIT license.

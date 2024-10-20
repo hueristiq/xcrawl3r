@@ -14,15 +14,137 @@ import (
 	"github.com/gocolly/colly/v2/debug"
 	"github.com/gocolly/colly/v2/extensions"
 	"github.com/gocolly/colly/v2/proxy"
-	hqurl "github.com/hueristiq/hqgoutils/url"
+	hqgourl "github.com/hueristiq/hq-go-url"
+	"github.com/hueristiq/xcrawl3r/internal/configuration"
 )
 
-type Options struct { //nolint:govet // To be refactored
+type Crawler struct {
 	Domain            string
 	IncludeSubdomains bool
 	Seeds             []string
 
-	Depth     int
+	Headless bool
+	Headers  []string
+	Proxies  []string
+	Render   bool
+	// Timeout   int
+	UserAgent string
+
+	// Concurrency    int
+	Delay int
+	// MaxRandomDelay int
+	Parallelism int
+
+	Debug bool
+
+	FileURLsRegex *regexp.Regexp
+
+	URLsNotToRequestRegex *regexp.Regexp
+	URLsRegex             *regexp.Regexp
+
+	PageCollector *colly.Collector
+	FileCollector *colly.Collector
+}
+
+func (crawler *Crawler) Crawl() (results chan Result) {
+	results = make(chan Result)
+
+	go func() {
+		defer close(results)
+
+		seedsChannel := make(chan string, crawler.Parallelism)
+
+		go func() {
+			defer close(seedsChannel)
+
+			for index := range crawler.Seeds {
+				seed := crawler.Seeds[index]
+
+				seedsChannel <- seed
+			}
+		}()
+
+		URLsWG := new(sync.WaitGroup)
+
+		for range crawler.Parallelism {
+			URLsWG.Add(1)
+
+			go func() {
+				defer URLsWG.Done()
+
+				for seed := range seedsChannel {
+					parsedSeed, err := up.Parse(seed)
+					if err != nil {
+						continue
+					}
+
+					seenURLs := &sync.Map{}
+
+					wg := &sync.WaitGroup{}
+
+					wg.Add(1)
+
+					go func() {
+						defer wg.Done()
+
+						for URL := range crawler.sitemapParsing(parsedSeed) {
+							_, loaded := seenURLs.LoadOrStore(URL.Value, struct{}{})
+							if loaded {
+								continue
+							}
+
+							results <- URL
+						}
+					}()
+
+					wg.Add(1)
+
+					go func() {
+						defer wg.Done()
+
+						for URL := range crawler.robotsParsing(parsedSeed) {
+							_, loaded := seenURLs.LoadOrStore(URL, struct{}{})
+							if loaded {
+								continue
+							}
+
+							results <- URL
+						}
+					}()
+
+					wg.Add(1)
+
+					go func() {
+						defer wg.Done()
+
+						for URL := range crawler.pageCrawl(parsedSeed) {
+							_, loaded := seenURLs.LoadOrStore(URL, struct{}{})
+							if loaded {
+								continue
+							}
+
+							results <- URL
+						}
+					}()
+
+					wg.Wait()
+				}
+			}()
+		}
+
+		URLsWG.Wait()
+	}()
+
+	return
+}
+
+type Configuration struct {
+	Depth int
+
+	Domain            string
+	IncludeSubdomains bool
+	Seeds             []string
+
 	Headless  bool
 	Headers   []string
 	Proxies   []string
@@ -38,85 +160,62 @@ type Options struct { //nolint:govet // To be refactored
 	Debug bool
 }
 
-type Crawler struct { //nolint:govet // To be refactored
-	Domain            string
-	IncludeSubdomains bool
-	Seeds             []string
+var (
+	DefaultUserAgent = fmt.Sprintf("%s v%s (https://github.com/hueristiq/%s)", configuration.NAME, configuration.VERSION, configuration.NAME)
+	up               = hqgourl.NewParser()
+)
 
-	Depth     int
-	Headless  bool
-	Headers   []string
-	Proxies   []string
-	Render    bool
-	Timeout   int
-	UserAgent string
-
-	Concurrency    int
-	Delay          int
-	MaxRandomDelay int
-	Parallelism    int
-
-	Debug bool
-
-	PageCollector         *colly.Collector
-	FileURLsRegex         *regexp.Regexp
-	FileCollector         *colly.Collector
-	URLsNotToRequestRegex *regexp.Regexp
-	URLsRegex             *regexp.Regexp
-}
-
-func New(options *Options) (crawler *Crawler, err error) {
+func New(cfg *Configuration) (crawler *Crawler, err error) {
 	crawler = &Crawler{
-		Domain:            options.Domain,
-		IncludeSubdomains: options.IncludeSubdomains,
-		Seeds:             options.Seeds,
+		Domain:            cfg.Domain,
+		IncludeSubdomains: cfg.IncludeSubdomains,
+		Seeds:             cfg.Seeds,
 
-		Depth:     options.Depth,
-		Headless:  options.Headless,
-		Headers:   options.Headers,
-		Proxies:   options.Proxies,
-		Render:    options.Render,
-		Timeout:   options.Timeout,
-		UserAgent: options.UserAgent,
+		Headless: cfg.Headless,
+		Headers:  cfg.Headers,
+		Proxies:  cfg.Proxies,
+		Render:   cfg.Render,
+		// Timeout:   cfg.Timeout,
+		UserAgent: cfg.UserAgent,
 
-		Concurrency:    options.Concurrency,
-		Delay:          options.Delay,
-		MaxRandomDelay: options.MaxRandomDelay,
-		Parallelism:    options.Parallelism,
+		// Concurrency:    cfg.Concurrency,
+		Delay: cfg.Delay,
+		// MaxRandomDelay: cfg.MaxRandomDelay,
+		Parallelism: cfg.Parallelism,
 
-		Debug: options.Debug,
+		Debug: cfg.Debug,
 	}
 
-	crawler.URLsRegex = regexp.MustCompile(`(?:"|')(((?:[a-zA-Z]{1,10}://|//)[^"'/]{1,}\.[a-zA-Z]{2,}[^"']{0,})|((?:/|\.\./|\./)[^"'><,;| *()(%%$^/\\\[\]][^"'><,;|()]{1,})|([a-zA-Z0-9_\-/]{1,}/[a-zA-Z0-9_\-/]{1,}\.(?:[a-zA-Z]{1,4}|action)(?:[\?|#][^"|']{0,}|))|([a-zA-Z0-9_\-/]{1,}/[a-zA-Z0-9_\-/]{3,}(?:[\?|#][^"|']{0,}|))|([a-zA-Z0-9_\-]{1,}\.(?:php|asp|aspx|jsp|json|action|html|js|txt|xml)(?:[\?|#][^"|']{0,}|)))(?:"|')`) //nolint:gocritic // Works fine!
+	crawler.URLsRegex = hqgourl.NewExtractor().CompileRegex()
 
-	crawler.FileURLsRegex = regexp.MustCompile(`(?m).*?\.*(js|json|xml|csv|txt|map)(\?.*?|)$`) //nolint:gocritic // Works fine!
+	crawler.FileURLsRegex = regexp.MustCompile(`(?m).*?\.*(js|json|xml|csv|txt|map)(\?.*?|)$`)
 
 	crawler.URLsNotToRequestRegex = regexp.MustCompile(`(?i)\.(apng|bpm|png|bmp|gif|heif|ico|cur|jpg|jpeg|jfif|pjp|pjpeg|psd|raw|svg|tif|tiff|webp|xbm|3gp|aac|flac|mpg|mpeg|mp3|mp4|m4a|m4v|m4p|oga|ogg|ogv|mov|wav|webm|eot|woff|woff2|ttf|otf|css)(?:\?|#|$)`)
 
 	crawler.PageCollector = colly.NewCollector(
 		colly.Async(true),
 		colly.IgnoreRobotsTxt(),
-		colly.MaxDepth(crawler.Depth),
+		colly.MaxDepth(cfg.Depth),
 		colly.AllowedDomains(crawler.Domain, "www."+crawler.Domain),
 	)
 
 	if crawler.IncludeSubdomains {
-		crawler.PageCollector.AllowedDomains = nil
+		crawler.PageCollector.AllowedDomains = []string{}
 
-		escapedDomain := regexp.QuoteMeta(crawler.Domain)
-		pattern := fmt.Sprintf(`https?://([a-z0-9.-]*\.)?%s(/[a-zA-Z0-9()/*\-+_~:,.?#=]*)?`, escapedDomain)
+		// pattern := fmt.Sprintf(`https?://([a-z0-9.-]*\.)?%s(/[a-zA-Z0-9()/*\-+_~:,.?#=]*)?`, regexp.QuoteMeta(crawler.Domain))
 
 		crawler.PageCollector.URLFilters = []*regexp.Regexp{
-			regexp.MustCompile(pattern),
+			// regexp.MustCompile(pattern),
+			hqgourl.NewExtractor(hqgourl.ExtractorWithSchemePattern(`(?:https?)://`)).CompileRegex(),
 		}
 	}
 
-	crawler.PageCollector.SetRequestTimeout(time.Duration(crawler.Timeout) * time.Second)
+	crawler.PageCollector.SetRequestTimeout(time.Duration(cfg.Timeout) * time.Second)
 
 	if err = crawler.PageCollector.Limit(&colly.LimitRule{
 		DomainGlob:  "*",
-		Parallelism: crawler.Concurrency,
-		RandomDelay: time.Duration(crawler.MaxRandomDelay) * time.Second,
+		Parallelism: cfg.Concurrency,
+		RandomDelay: time.Duration(cfg.MaxRandomDelay) * time.Second,
 	}); err != nil {
 		return
 	}
@@ -132,7 +231,7 @@ func New(options *Options) (crawler *Crawler, err error) {
 
 				var splitEntry []string
 
-				if strings.Contains(entry, ": ") { //nolint:gocritic // Works!
+				if strings.Contains(entry, ": ") {
 					splitEntry = strings.SplitN(entry, ": ", 2)
 				} else if strings.Contains(entry, ":") {
 					splitEntry = strings.SplitN(entry, ":", 2)
@@ -150,26 +249,30 @@ func New(options *Options) (crawler *Crawler, err error) {
 
 	extensions.Referer(crawler.PageCollector)
 
-	switch ua := strings.ToLower(crawler.UserAgent); {
-	case strings.HasPrefix(ua, "mob"):
-		extensions.RandomMobileUserAgent(crawler.PageCollector)
-	case strings.HasPrefix(ua, "web"):
-		extensions.RandomUserAgent(crawler.PageCollector)
-	default:
-		crawler.PageCollector.UserAgent = crawler.UserAgent
+	if crawler.UserAgent == "" {
+		crawler.PageCollector.UserAgent = DefaultUserAgent
+	} else {
+		switch ua := strings.ToLower(crawler.UserAgent); {
+		case strings.HasPrefix(ua, "mob"):
+			extensions.RandomMobileUserAgent(crawler.PageCollector)
+		case strings.HasPrefix(ua, "web"):
+			extensions.RandomUserAgent(crawler.PageCollector)
+		default:
+			crawler.PageCollector.UserAgent = crawler.UserAgent
+		}
 	}
 
 	HTTPTransport := &http.Transport{
 		DialContext: (&net.Dialer{
-			Timeout:   time.Duration(crawler.Timeout) * time.Second,
-			KeepAlive: time.Duration(crawler.Timeout) * time.Second,
+			Timeout:   time.Duration(cfg.Timeout) * time.Second,
+			KeepAlive: time.Duration(cfg.Timeout) * time.Second,
 		}).DialContext,
 		MaxIdleConns:        100, // Golang default is 100
 		MaxConnsPerHost:     1000,
-		IdleConnTimeout:     time.Duration(crawler.Timeout) * time.Second,
-		TLSHandshakeTimeout: time.Duration(crawler.Timeout) * time.Second,
+		IdleConnTimeout:     time.Duration(cfg.Timeout) * time.Second,
+		TLSHandshakeTimeout: time.Duration(cfg.Timeout) * time.Second,
 		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: true, //nolint:gosec // Intended
+			InsecureSkipVerify: true,
 			Renegotiation:      tls.RenegotiateOnceAsClient,
 		},
 	}
@@ -179,21 +282,25 @@ func New(options *Options) (crawler *Crawler, err error) {
 		CheckRedirect: func(req *http.Request, via []*http.Request) (err error) {
 			nextLocation := req.Response.Header.Get("Location")
 
-			var parsedLocation *hqurl.URL
+			var parsedLocation *hqgourl.URL
 
-			parsedLocation, err = hqurl.Parse(nextLocation)
+			parsedLocation, err = up.Parse(nextLocation)
 			if err != nil {
-				return err
+				return
 			}
 
-			if crawler.IncludeSubdomains &&
-				(parsedLocation.Domain == crawler.Domain ||
-					strings.HasSuffix(parsedLocation.Domain, "."+crawler.Domain)) {
-				return nil
+			if parsedLocation.Domain == nil {
+				return
 			}
 
-			if parsedLocation.Domain == crawler.Domain || parsedLocation.Domain == "www."+crawler.Domain {
-				return nil
+			fmt.Println(parsedLocation)
+
+			if cfg.IncludeSubdomains && (parsedLocation.Domain.String() == cfg.Domain || strings.HasSuffix(parsedLocation.Domain.String(), "."+cfg.Domain)) {
+				return
+			}
+
+			if parsedLocation.Domain.String() == cfg.Domain || parsedLocation.Domain.String() == "www."+cfg.Domain {
+				return
 			}
 
 			return http.ErrUseLastResponse
@@ -206,9 +313,7 @@ func New(options *Options) (crawler *Crawler, err error) {
 	// Proxies
 	// NOTE: Must come AFTER .SetClient calls
 	if len(crawler.Proxies) > 0 {
-		var (
-			rrps colly.ProxyFunc
-		)
+		var rrps colly.ProxyFunc
 
 		rrps, err = proxy.RoundRobinProxySwitcher(crawler.Proxies...)
 		if err != nil {
@@ -223,97 +328,6 @@ func New(options *Options) (crawler *Crawler, err error) {
 
 	crawler.PageCollector.ID = 1
 	crawler.FileCollector.ID = 2
-
-	return
-}
-
-func (crawler *Crawler) Crawl() (URLsChannel chan URL) {
-	URLsChannel = make(chan URL)
-
-	go func() {
-		defer close(URLsChannel)
-
-		seedsChannel := make(chan string, crawler.Parallelism)
-
-		go func() {
-			defer close(seedsChannel)
-
-			for index := range crawler.Seeds {
-				seed := crawler.Seeds[index]
-
-				seedsChannel <- seed
-			}
-		}()
-
-		URLsWG := new(sync.WaitGroup)
-
-		for i := 0; i < crawler.Parallelism; i++ {
-			URLsWG.Add(1)
-
-			go func() {
-				defer URLsWG.Done()
-
-				for seed := range seedsChannel {
-					parsedSeed, err := hqurl.Parse(seed)
-					if err != nil {
-						continue
-					}
-
-					wg := &sync.WaitGroup{}
-					seen := &sync.Map{}
-
-					wg.Add(1)
-
-					go func() {
-						defer wg.Done()
-
-						for URL := range crawler.sitemapParsing(parsedSeed) {
-							_, loaded := seen.LoadOrStore(URL.Value, struct{}{})
-							if loaded {
-								continue
-							}
-
-							URLsChannel <- URL
-						}
-					}()
-
-					wg.Add(1)
-
-					go func() {
-						defer wg.Done()
-
-						for URL := range crawler.robotsParsing(parsedSeed) {
-							_, loaded := seen.LoadOrStore(URL, struct{}{})
-							if loaded {
-								continue
-							}
-
-							URLsChannel <- URL
-						}
-					}()
-
-					wg.Add(1)
-
-					go func() {
-						defer wg.Done()
-
-						for URL := range crawler.pageCrawl(parsedSeed) {
-							_, loaded := seen.LoadOrStore(URL, struct{}{})
-							if loaded {
-								continue
-							}
-
-							URLsChannel <- URL
-						}
-					}()
-
-					wg.Wait()
-				}
-			}()
-		}
-
-		URLsWG.Wait()
-	}()
 
 	return
 }
