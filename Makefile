@@ -2,7 +2,7 @@
 SHELL = /bin/sh
 
 # Define the project name for easy reference.
-PROJECT = "xcrawl3rr"
+PROJECT = "xcrawl3r"
 
 # The default target that gets executed when the `make` command is run without arguments.
 # In this case, it will trigger the `go-build` target.

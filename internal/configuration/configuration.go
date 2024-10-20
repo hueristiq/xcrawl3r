@@ -3,8 +3,8 @@ package configuration
 import "github.com/logrusorgru/aurora/v3"
 
 const (
-	NAME    string = "xcrawl3r"
-	VERSION string = "0.1.0"
+	NAME    = "xcrawl3r"
+	VERSION = "0.1.0"
 )
 
 var BANNER = aurora.Sprintf(
