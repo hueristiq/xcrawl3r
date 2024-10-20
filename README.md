@@ -102,8 +102,8 @@ go install -v github.com/hueristiq/xcrawl3r/cmd/xcrawl3r@latest
 	```bash
 	sudo mv xcrawl3r /usr/local/bin/
 	```
-	> [!NOTE]
-	> Windows users can follow [How to: Add Tool Locations to the PATH Environment Variable](https://msdn.microsoft.com/en-us/library/office/ee537574(v=office.14).aspx) in order to add `xcrawl3r` to their `PATH`.
+
+	Windows users can follow [How to: Add Tool Locations to the PATH Environment Variable](https://msdn.microsoft.com/en-us/library/office/ee537574(v=office.14).aspx) in order to add `xcrawl3r` to their `PATH`.
 
 
 > [!CAUTION]
