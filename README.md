@@ -136,50 +136,51 @@ xcrawl3r -h
 Here's what the help message looks like:
 
 ```text
-                             _ _____      
-__  _____ _ __ __ ___      _| |___ / _ __ 
-\ \/ / __| '__/ _` \ \ /\ / / | |_ \| '__|
- >  < (__| | | (_| |\ V  V /| |___) | |   
-/_/\_\___|_|  \__,_| \_/\_/ |_|____/|_| v0.1.0
 
-A CLI utility to recursively crawl webpages.
+                             _ _____
+__  _____ _ __ __ ___      _| |___ / _ __
+\ \/ / __| '__/ _` \ \ /\ / / | |_ \| '__|
+ >  < (__| | | (_| |\ V  V /| |___) | |
+/_/\_\___|_|  \__,_| \_/\_/ |_|____/|_|
+                                    v0.1.0
 
 USAGE:
   xcrawl3r [OPTIONS]
 
 INPUT:
-  -d, --domain string               domain to match URLs
-      --include-subdomains bool     match subdomains' URLs
-  -s, --seeds string                seed URLs file (use `-` to get from stdin)
-  -u, --url string                  URL to crawl
+ -d, --domain string               domain to match URLs
+     --include-subdomains bool     match subdomains' URLs
+ -s, --seeds string                seed URLs file (use `-` to get from stdin)
+ -u, --url string                  URL to crawl
 
 CONFIGURATION:
-      --depth int                   maximum depth to crawl (default 3)
-                                       TIP: set it to `0` for infinite recursion
-      --headless bool               If true the browser will be displayed while crawling.
-  -H, --headers string[]            custom header to include in requests
-                                       e.g. -H 'Referer: http://example.com/'
-                                       TIP: use multiple flag to set multiple headers
-      --proxy string[]              Proxy URL (e.g: http://127.0.0.1:8080)
-                                       TIP: use multiple flag to set multiple proxies
-      --render bool                 utilize a headless chrome instance to render pages
-      --timeout int                 time to wait for request in seconds (default: 10)
-      --user-agent string           User Agent to use (default: web)
-                                       TIP: use `web` for a random web user-agent,
-                                       `mobile` for a random mobile user-agent,
-                                        or you can set your specific user-agent.
+     --depth int                   maximum depth to crawl (default 3)
+                                      TIP: set it to `0` for infinite recursion
+     --headless bool               If true the browser will be displayed while crawling.
+ -H, --headers string[]            custom header to include in requests
+                                      e.g. -H 'Referer: http://example.com/'
+                                      TIP: use multiple flag to set multiple headers
+     --proxy string[]              Proxy URL (e.g: http://127.0.0.1:8080)
+                                      TIP: use multiple flag to set multiple proxies
+     --render bool                 utilize a headless chrome instance to render pages
+     --timeout int                 time to wait for request in seconds (default: 10)
+     --user-agent string           User Agent to use (default: xcrawl3r v0.1.0 (https://github.com/hueristiq/xcrawl3r))
+                                      TIP: use `web` for a random web user-agent,
+                                      `mobile` for a random mobile user-agent,
+                                       or you can set your specific user-agent.
 
 RATE LIMIT:
-  -c, --concurrency int             number of concurrent fetchers to use (default 10)
-      --delay int                   delay between each request in seconds
-      --max-random-delay int        maximux extra randomized delay added to `--dalay` (default: 1s)
-  -p, --parallelism int             number of concurrent URLs to process (default: 10)
+ -c, --concurrency int             number of concurrent fetchers to use (default 10)
+     --delay int                   delay between each request in seconds
+     --max-random-delay int        maximux extra randomized delay added to `--dalay` (default: 1s)
+ -p, --parallelism int             number of concurrent URLs to process (default: 10)
 
 OUTPUT:
-      --debug bool                  enable debug mode (default: false)
-  -m, --monochrome bool             coloring: no colored output mode
-  -o, --output string               output file to write found URLs
-  -v, --verbosity string            debug, info, warning, error, fatal or silent (default: debug)
+     --debug bool                  enable debug mode (default: false)
+ -m, --monochrome bool             coloring: no colored output mode
+ -o, --output string               output file to write found URLs
+     --silent bool                 display output URLs only
+ -v, --verbose bool                display verbose output
 
 ```
 
