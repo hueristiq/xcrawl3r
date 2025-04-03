@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/gocolly/colly/v2"
-	"github.com/hueristiq/xcrawl3r/pkg/browser"
+	"github.com/hueristiq/xcrawl3r/pkg/xcrawl3r/browser"
 	"go.source.hueristiq.com/url/parser"
 )
 
