@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
-	sitemap "github.com/hueristiq/xcrawl3r/pkg/parser/sitemap"
+	sitemap "github.com/hueristiq/xcrawl3r/pkg/xcrawl3r/parser/sitemap"
 	hqgohttp "go.source.hueristiq.com/http"
 	"go.source.hueristiq.com/http/method"
 	"go.source.hueristiq.com/url/parser"
