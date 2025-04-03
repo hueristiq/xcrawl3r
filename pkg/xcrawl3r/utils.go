@@ -3,7 +3,7 @@ package xcrawl3r
 import (
 	"strings"
 
-	hqgourl "github.com/hueristiq/hq-go-url"
+	"go.source.hueristiq.com/url/parser"
 )
 
 func decode(source string) (decodedSource string) {
@@ -17,7 +17,7 @@ func decode(source string) (decodedSource string) {
 	return
 }
 
-func (crawler *Crawler) fixURL(parsedURL *hqgourl.URL, URL string) (fixedURL string) {
+func (crawler *Crawler) fixURL(parsedURL *parser.URL, URL string) (fixedURL string) {
 	// decode
 	// this ....
 	if strings.HasPrefix(URL, "http") {

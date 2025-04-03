@@ -9,9 +9,9 @@ import (
 type entry struct {
 	Type            EntryType
 	Location        string               `xml:"loc"`
-	LastModified    string               `xml:"lastmod,omitempy"`
-	ChangeFrequency EntryChangeFrequency `xml:"changefreq,omitempty"`
-	Priority        float32              `xml:"priority,omitempty"`
+	LastModified    string               `xml:"lastmod"`
+	ChangeFrequency EntryChangeFrequency `xml:"changefreq"`
+	Priority        float32              `xml:"priority"`
 }
 
 func (e *entry) GetType() EntryType {

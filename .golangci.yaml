@@ -135,7 +135,7 @@ linters:
         # - depguard
         - dogsled
         - dupl
-        - dupword
+        # - dupword
         - durationcheck
         - err113
         - errcheck

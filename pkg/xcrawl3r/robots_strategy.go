@@ -7,12 +7,13 @@ import (
 	"regexp"
 	"strings"
 
-	hqgohttp "github.com/hueristiq/hq-go-http"
-	"github.com/hueristiq/hq-go-http/status"
-	hqgourl "github.com/hueristiq/hq-go-url"
+	hqgohttp "go.source.hueristiq.com/http"
+	"go.source.hueristiq.com/http/method"
+	"go.source.hueristiq.com/http/status"
+	"go.source.hueristiq.com/url/parser"
 )
 
-func (crawler *Crawler) robotsParsing(parsedURL *hqgourl.URL) <-chan Result {
+func (crawler *Crawler) robotsParsing(parsedURL *parser.URL) <-chan Result {
 	results := make(chan Result)
 
 	go func() {
@@ -20,7 +21,7 @@ func (crawler *Crawler) robotsParsing(parsedURL *hqgourl.URL) <-chan Result {
 
 		robotsURL := fmt.Sprintf("%s://%s/robots.txt", parsedURL.Scheme, parsedURL.Host)
 
-		res, err := hqgohttp.Get(robotsURL)
+		res, err := hqgohttp.Request().Method(method.GET.String()).URL(robotsURL).Send()
 		if err != nil {
 			result := Result{
 				Type:   ResultError,
@@ -35,7 +36,7 @@ func (crawler *Crawler) robotsParsing(parsedURL *hqgourl.URL) <-chan Result {
 
 		defer res.Body.Close()
 
-		if res.StatusCode != status.OK {
+		if res.StatusCode != status.OK.Int() {
 			result := Result{
 				Type:   ResultError,
 				Source: "known:robots",

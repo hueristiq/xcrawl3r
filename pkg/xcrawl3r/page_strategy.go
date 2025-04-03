@@ -6,11 +6,11 @@ import (
 	"strings"
 
 	"github.com/gocolly/colly/v2"
-	hqgourl "github.com/hueristiq/hq-go-url"
 	"github.com/hueristiq/xcrawl3r/pkg/browser"
+	"go.source.hueristiq.com/url/parser"
 )
 
-func (crawler *Crawler) pageCrawl(parsedURL *hqgourl.URL) <-chan Result {
+func (crawler *Crawler) pageCrawl(parsedURL *parser.URL) <-chan Result {
 	results := make(chan Result)
 
 	go func() {

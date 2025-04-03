@@ -3,28 +3,27 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"io/fs"
 	"os"
 	"path/filepath"
-	"strings"
 
-	hqgourl "github.com/hueristiq/hq-go-url"
-	"github.com/hueristiq/hqgolog"
-	"github.com/hueristiq/hqgolog/formatter"
-	"github.com/hueristiq/hqgolog/levels"
 	"github.com/hueristiq/xcrawl3r/internal/configuration"
+	"github.com/hueristiq/xcrawl3r/pkg/stdio"
 	"github.com/hueristiq/xcrawl3r/pkg/xcrawl3r"
-	"github.com/logrusorgru/aurora/v3"
+	"github.com/logrusorgru/aurora/v4"
 	"github.com/spf13/pflag"
+	"go.source.hueristiq.com/logger"
+	"go.source.hueristiq.com/logger/formatter"
+	"go.source.hueristiq.com/logger/levels"
 )
 
 var (
-	au aurora.Aurora
+	au = aurora.New(aurora.WithColors(true))
+
+	URLs         []string
+	URLsFilePath string
 
 	domain            string
 	includeSubdomains bool
-	seedsFile         string
-	URL               string
 
 	depth     int
 	headless  bool
@@ -49,10 +48,11 @@ var (
 
 func init() {
 	// Handle command line arguments & flags
+	pflag.StringSliceVarP(&URLs, "url", "u", []string{}, "")
+	pflag.StringVarP(&URLsFilePath, "list", "l", "", "")
+
 	pflag.StringVarP(&domain, "domain", "d", "", "")
 	pflag.BoolVar(&includeSubdomains, "include-subdomains", false, "")
-	pflag.StringVarP(&seedsFile, "seeds", "s", "", "")
-	pflag.StringVarP(&URL, "url", "u", "", "")
 
 	pflag.IntVar(&depth, "depth", 3, "")
 	pflag.BoolVar(&headless, "headless", false, "")
@@ -76,16 +76,18 @@ func init() {
 
 	pflag.CommandLine.SortFlags = false
 	pflag.Usage = func() {
-		fmt.Fprintln(os.Stderr, configuration.BANNER)
+		logger.Info().Label("").Msg(configuration.BANNER(au))
 
-		h := "\nUSAGE:\n"
-		h += "  xcrawl3r [OPTIONS]\n"
+		h := "USAGE:\n"
+		h += fmt.Sprintf(" %s [OPTIONS]\n", configuration.NAME)
 
 		h += "\nINPUT:\n"
+		h += " -u, --url string[]             target URL\n"
+		h += " -l, --list string                 target URLs list file path\n"
+
+		h += "\nSCOPE:\n"
 		h += " -d, --domain string               domain to match URLs\n"
 		h += "     --include-subdomains bool     match subdomains' URLs\n"
-		h += " -s, --seeds string                seed URLs file (use `-` to get from stdin)\n"
-		h += " -u, --url string                  URL to crawl\n"
 
 		h += "\nCONFIGURATION:\n"
 		h += "     --depth int                   maximum depth to crawl (default 3)\n"
@@ -116,102 +118,81 @@ func init() {
 		h += "     --silent bool                 display output URLs only\n"
 		h += " -v, --verbose bool                display verbose output\n"
 
-		fmt.Fprint(os.Stderr, h)
+		logger.Info().Label("").Msg(h)
+		logger.Print().Msg("")
 	}
 
 	pflag.Parse()
 
-	// Initialize logger
-	hqgolog.DefaultLogger.SetMaxLevel(levels.LevelInfo)
-
-	if verbose {
-		hqgolog.DefaultLogger.SetMaxLevel(levels.LevelDebug)
-	}
-
-	hqgolog.DefaultLogger.SetFormatter(formatter.NewCLI(&formatter.CLIOptions{
+	logger.DefaultLogger.SetFormatter(formatter.NewConsoleFormatter(&formatter.ConsoleFormatterConfiguration{
 		Colorize: !monochrome,
 	}))
 
-	au = aurora.NewAurora(!monochrome)
+	if verbose {
+		logger.DefaultLogger.SetMaxLogLevel(levels.LevelDebug)
+	}
+
+	if silent {
+		logger.DefaultLogger.SetMaxLogLevel(levels.LevelSilent)
+	}
+
+	au = aurora.New(aurora.WithColors(!monochrome))
 }
 
 func main() {
-	if !silent {
-		fmt.Fprintln(os.Stderr, configuration.BANNER)
-	}
+	logger.Info().Label("").Msg(configuration.BANNER(au))
 
-	hqgolog.Print().Msg("")
+	var err error
 
-	if seedsFile != "" && URL == "" && domain == "" {
-		hqgolog.Fatal().Msg("using `-s, --seeds` requires either `-d, --domain` or `-u, --url` to be set!")
-	}
+	// load input URLs from file
+	if URLsFilePath != "" {
+		var file *os.File
 
-	up := hqgourl.NewParser()
-
-	// Load input URLs
-	seeds := []string{}
-
-	if URL != "" {
-		seeds = append(seeds, URL)
-
-		if domain == "" {
-			parsed, err := up.Parse(URL)
-			if err != nil {
-				hqgolog.Fatal().Msg(err.Error())
-			}
-
-			domain = parsed.Domain.String()
-			domain = strings.TrimPrefix(domain, "www.")
-		}
-	}
-
-	if seedsFile != "" {
-		var (
-			err  error
-			file *os.File
-			stat fs.FileInfo
-		)
-
-		switch {
-		case seedsFile != "" && seedsFile == "-":
-			stat, err = os.Stdin.Stat()
-			if err != nil {
-				hqgolog.Fatal().Msg("no stdin")
-			}
-
-			if stat.Mode()&os.ModeNamedPipe == 0 {
-				hqgolog.Fatal().Msg("no stdin")
-			}
-
-			file = os.Stdin
-		case seedsFile != "" && seedsFile != "-":
-			file, err = os.Open(seedsFile)
-			if err != nil {
-				hqgolog.Fatal().Msg(err.Error())
-			}
-		default:
-			hqgolog.Fatal().Msg("xcrawl3r takes input from stdin or file using a flag")
+		file, err = os.Open(URLsFilePath)
+		if err != nil {
+			logger.Error().Msg(err.Error())
 		}
 
 		scanner := bufio.NewScanner(file)
 
 		for scanner.Scan() {
-			inputURL := scanner.Text()
+			URL := scanner.Text()
 
-			if inputURL != "" {
-				seeds = append(seeds, inputURL)
+			if URL != "" {
+				URLs = append(URLs, URL)
 			}
 		}
 
-		if scanner.Err() != nil {
-			hqgolog.Fatal().Msgf("%s", err)
+		if err = scanner.Err(); err != nil {
+			logger.Error().Msg(err.Error())
 		}
 	}
 
+	// load input URLs from stdin
+	if stdio.HasStdIn() {
+		scanner := bufio.NewScanner(os.Stdin)
+
+		for scanner.Scan() {
+			URL := scanner.Text()
+
+			if URL != "" {
+				URLs = append(URLs, URL)
+			}
+		}
+
+		if err = scanner.Err(); err != nil {
+			logger.Error().Msg(err.Error())
+		}
+	}
+
+	logger.Info().Msgf("Crawling URLs for %s...", au.Underline(len(URLs)).Bold())
+	logger.Print().Msg("")
+
 	cfg := &xcrawl3r.Configuration{
+		URLs: URLs,
+
 		Domain:            domain,
 		IncludeSubdomains: includeSubdomains,
-		Seeds:             seeds,
 
 		Depth:     depth,
 		Headless:  headless,
@@ -231,7 +212,7 @@ func main() {
 
 	crawler, err := xcrawl3r.New(cfg)
 	if err != nil {
-		hqgolog.Fatal().Msg(err.Error())
+		logger.Fatal().Msg(err.Error())
 	}
 
 	var writer *bufio.Writer
@@ -241,7 +222,7 @@ func main() {
 
 		if _, err := os.Stat(directory); os.IsNotExist(err) {
 			if err = os.MkdirAll(directory, os.ModePerm); err != nil {
-				hqgolog.Fatal().Msg(err.Error())
+				logger.Fatal().Msg(err.Error())
 			}
 		}
 
@@ -249,7 +230,7 @@ func main() {
 
 		file, err = os.OpenFile(output, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 		if err != nil {
-			hqgolog.Fatal().Msg(err.Error())
+			logger.Fatal().Msg(err.Error())
 		}
 
 		defer file.Close()
@@ -261,20 +242,20 @@ func main() {
 		switch URL.Type {
 		case xcrawl3r.ResultError:
 			if verbose {
-				hqgolog.Error().Msgf("%s: %s\n", URL.Source, URL.Error)
+				logger.Error().Msgf("%s: %s\n", URL.Source, URL.Error)
 			}
 		case xcrawl3r.ResultURL:
 			if verbose {
-				hqgolog.Print().Msgf("[%s] %s", au.BrightBlue(URL.Source), URL.Value)
+				logger.Print().Msgf("[%s] %s", au.BrightBlue(URL.Source), URL.Value)
 			} else {
-				hqgolog.Print().Msg(URL.Value)
+				logger.Print().Msg(URL.Value)
 			}
 
 			if writer != nil {
 				fmt.Fprintln(writer, URL.Value)
 
 				if err := writer.Flush(); err != nil {
-					hqgolog.Fatal().Msg(err.Error())
+					logger.Fatal().Msg(err.Error())
 				}
 			}
 		}

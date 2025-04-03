@@ -5,7 +5,7 @@ import (
 	"log"
 
 	"github.com/chromedp/chromedp"
-	"github.com/hueristiq/hqgolog"
+	"go.source.hueristiq.com/logger"
 )
 
 var (
@@ -23,12 +23,12 @@ func GetRenderedSource(url string) (outerHTML string) {
 	if err := chromedp.Run(newCtx); err != nil {
 		newCtxCancel()
 
-		hqgolog.Fatal().Msg(err.Error())
+		logger.Fatal().Msg(err.Error())
 	}
 
 	// navigate to a page, and get it's entire HTML
 	if err := chromedp.Run(newCtx, chromedp.Navigate(url), chromedp.OuterHTML("html", &outerHTML)); err != nil {
-		hqgolog.Error().Msg(err.Error())
+		logger.Error().Msg(err.Error())
 	}
 
 	return
@@ -53,7 +53,7 @@ func GetGlobalContext(headless bool, proxy string) (ctx context.Context, cancel 
 
 	// ensure the first tab is created
 	if err := chromedp.Run(ctx); err != nil {
-		hqgolog.Fatal().Msg(err.Error())
+		logger.Fatal().Msg(err.Error())
 	}
 
 	return

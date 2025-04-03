@@ -4,12 +4,13 @@ import (
 	"fmt"
 	"net/http"
 
-	hqgohttp "github.com/hueristiq/hq-go-http"
-	hqgourl "github.com/hueristiq/hq-go-url"
 	sitemap "github.com/hueristiq/xcrawl3r/pkg/parser/sitemap"
+	hqgohttp "go.source.hueristiq.com/http"
+	"go.source.hueristiq.com/http/method"
+	"go.source.hueristiq.com/url/parser"
 )
 
-func (crawler *Crawler) sitemapParsing(parsedURL *hqgourl.URL) <-chan Result {
+func (crawler *Crawler) sitemapParsing(parsedURL *parser.URL) <-chan Result {
 	results := make(chan Result)
 
 	go func() {
@@ -61,7 +62,7 @@ func (crawler *Crawler) sitemapParsing(parsedURL *hqgourl.URL) <-chan Result {
 func (crawler *Crawler) parseSitemap(URL string, results chan Result) (err error) {
 	var res *http.Response
 
-	res, err = hqgohttp.Get(URL)
+	res, err = hqgohttp.Request().Method(method.GET.String()).URL(URL).Send()
 	if err != nil {
 		return
 	}

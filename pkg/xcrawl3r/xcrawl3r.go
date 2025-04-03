@@ -14,14 +14,16 @@ import (
 	"github.com/gocolly/colly/v2/debug"
 	"github.com/gocolly/colly/v2/extensions"
 	"github.com/gocolly/colly/v2/proxy"
-	hqgourl "github.com/hueristiq/hq-go-url"
 	"github.com/hueristiq/xcrawl3r/internal/configuration"
+	"go.source.hueristiq.com/url/extractor"
+	"go.source.hueristiq.com/url/parser"
 )
 
 type Crawler struct {
+	URLs []string
+
 	Domain            string
 	IncludeSubdomains bool
-	Seeds             []string
 
 	Headless bool
 	Headers  []string
@@ -52,15 +54,13 @@ func (crawler *Crawler) Crawl() (results chan Result) {
 	go func() {
 		defer close(results)
 
-		seedsChannel := make(chan string, crawler.Parallelism)
+		URLsChannel := make(chan string, crawler.Parallelism)
 
 		go func() {
-			defer close(seedsChannel)
+			defer close(URLsChannel)
 
-			for index := range crawler.Seeds {
-				seed := crawler.Seeds[index]
-
-				seedsChannel <- seed
+			for _, URL := range crawler.URLs {
+				URLsChannel <- URL
 			}
 		}()
 
@@ -72,7 +72,7 @@ func (crawler *Crawler) Crawl() (results chan Result) {
 			go func() {
 				defer URLsWG.Done()
 
-				for seed := range seedsChannel {
+				for seed := range URLsChannel {
 					parsedSeed, err := up.Parse(seed)
 					if err != nil {
 						continue
@@ -139,11 +139,12 @@ func (crawler *Crawler) Crawl() (results chan Result) {
 }
 
 type Configuration struct {
+	URLs []string
+
 	Depth int
 
 	Domain            string
 	IncludeSubdomains bool
-	Seeds             []string
 
 	Headless  bool
 	Headers   []string
@@ -162,14 +163,14 @@ type Configuration struct {
 
 var (
 	DefaultUserAgent = fmt.Sprintf("%s v%s (https://github.com/hueristiq/%s)", configuration.NAME, configuration.VERSION, configuration.NAME)
-	up               = hqgourl.NewParser()
+	up               = parser.NewURLParser()
 )
 
 func New(cfg *Configuration) (crawler *Crawler, err error) {
 	crawler = &Crawler{
 		Domain:            cfg.Domain,
 		IncludeSubdomains: cfg.IncludeSubdomains,
-		Seeds:             cfg.Seeds,
+		URLs:              cfg.URLs,
 
 		Headless: cfg.Headless,
 		Headers:  cfg.Headers,
@@ -186,7 +187,7 @@ func New(cfg *Configuration) (crawler *Crawler, err error) {
 		Debug: cfg.Debug,
 	}
 
-	crawler.URLsRegex = hqgourl.NewExtractor().CompileRegex()
+	crawler.URLsRegex = extractor.New().CompileRegex()
 
 	crawler.FileURLsRegex = regexp.MustCompile(`(?m).*?\.*(js|json|xml|csv|txt|map)(\?.*?|)$`)
 
@@ -202,11 +203,10 @@ func New(cfg *Configuration) (crawler *Crawler, err error) {
 	if crawler.IncludeSubdomains {
 		crawler.PageCollector.AllowedDomains = []string{}
 
-		// pattern := fmt.Sprintf(`https?://([a-z0-9.-]*\.)?%s(/[a-zA-Z0-9()/*\-+_~:,.?#=]*)?`, regexp.QuoteMeta(crawler.Domain))
-
 		crawler.PageCollector.URLFilters = []*regexp.Regexp{
-			// regexp.MustCompile(pattern),
-			hqgourl.NewExtractor(hqgourl.ExtractorWithSchemePattern(`(?:https?)://`)).CompileRegex(),
+			extractor.New(
+				extractor.WithHostPattern(`(?:(?:\w+[.])*` + regexp.QuoteMeta(crawler.Domain) + extractor.ExtractorPortOptionalPattern + `)`),
+			).CompileRegex(),
 		}
 	}
 
@@ -282,7 +282,7 @@ func New(cfg *Configuration) (crawler *Crawler, err error) {
 		CheckRedirect: func(req *http.Request, via []*http.Request) (err error) {
 			nextLocation := req.Response.Header.Get("Location")
 
-			var parsedLocation *hqgourl.URL
+			var parsedLocation *parser.URL
 
 			parsedLocation, err = up.Parse(nextLocation)
 			if err != nil {
