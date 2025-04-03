@@ -1,21 +1,15 @@
-package stdio
+package input
 
-import (
-	"os"
-)
+import "os"
 
-func HasStdIn() (hasStdIn bool) {
+func HasStdin() bool {
 	stat, err := os.Stdin.Stat()
 	if err != nil {
-		hasStdIn = false
-
-		return
+		return false
 	}
 
 	isPipedFromChrDev := (stat.Mode() & os.ModeCharDevice) == 0
 	isPipedFromFIFO := (stat.Mode() & os.ModeNamedPipe) != 0
 
-	hasStdIn = isPipedFromChrDev || isPipedFromFIFO
-
-	return
+	return isPipedFromChrDev || isPipedFromFIFO
 }

@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/hueristiq/xcrawl3r/internal/configuration"
-	"github.com/hueristiq/xcrawl3r/pkg/stdio"
+	"github.com/hueristiq/xcrawl3r/internal/input"
 	"github.com/hueristiq/xcrawl3r/pkg/xcrawl3r"
 	"github.com/logrusorgru/aurora/v4"
 	"github.com/spf13/pflag"
@@ -169,7 +169,7 @@ func main() {
 	}
 
 	// load input URLs from stdin
-	if stdio.HasStdIn() {
+	if input.HasStdin() {
 		scanner := bufio.NewScanner(os.Stdin)
 
 		for scanner.Scan() {
