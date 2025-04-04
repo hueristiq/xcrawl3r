@@ -6,7 +6,6 @@ import (
 
 	sitemap "github.com/hueristiq/xcrawl3r/pkg/xcrawl3r/parser/sitemap"
 	hqgohttp "go.source.hueristiq.com/http"
-	"go.source.hueristiq.com/http/method"
 	"go.source.hueristiq.com/url/parser"
 )
 
@@ -62,7 +61,7 @@ func (crawler *Crawler) sitemapParsing(parsedURL *parser.URL) <-chan Result {
 func (crawler *Crawler) parseSitemap(URL string, results chan Result) (err error) {
 	var res *http.Response
 
-	res, err = hqgohttp.Request().Method(method.GET.String()).URL(URL).Send()
+	res, err = hqgohttp.Get(URL)
 	if err != nil {
 		return
 	}

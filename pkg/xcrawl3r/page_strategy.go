@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/gocolly/colly/v2"
-	"github.com/hueristiq/xcrawl3r/pkg/xcrawl3r/browser"
 	"go.source.hueristiq.com/url/parser"
 )
 
@@ -15,21 +14,6 @@ func (crawler *Crawler) pageCrawl(parsedURL *parser.URL) <-chan Result {
 
 	go func() {
 		defer close(results)
-
-		if crawler.Render {
-			// If we're using a proxy send it to the chrome instance
-			browser.GlobalContext, browser.GlobalCancel = browser.GetGlobalContext(crawler.Headless, strings.Join(crawler.Proxies, ","))
-
-			// Close the main tab when we end the main() function
-			defer browser.GlobalCancel()
-
-			// If renderJavascript, pass the response's body to the renderer and then replace the body for .OnHTML to handle.
-			crawler.PageCollector.OnResponse(func(request *colly.Response) {
-				html := browser.GetRenderedSource(request.Request.URL.String())
-
-				request.Body = []byte(html)
-			})
-		}
 
 		crawler.PageCollector.OnRequest(func(request *colly.Request) {
 			if match := crawler.URLsNotToRequestRegex.MatchString(request.URL.String()); match {
@@ -156,7 +140,7 @@ func (crawler *Crawler) pageCrawl(parsedURL *parser.URL) <-chan Result {
 
 		crawler.FileCollector.OnResponse(func(response *colly.Response) {
 			ext := path.Ext(response.Request.URL.Path)
-			body := decode(string(response.Body))
+			body := string(response.Body)
 			URLs := crawler.URLsRegex.FindAllString(body, -1)
 
 			for _, fileURL := range URLs {
@@ -175,8 +159,6 @@ func (crawler *Crawler) pageCrawl(parsedURL *parser.URL) <-chan Result {
 
 				// Get the absolute URL
 				fileURL = response.Request.AbsoluteURL(fileURL)
-
-				fileURL = crawler.fixURL(parsedURL, fileURL)
 
 				if !crawler.IsInScope(fileURL) {
 					continue

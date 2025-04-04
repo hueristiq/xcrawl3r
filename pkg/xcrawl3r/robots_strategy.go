@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	hqgohttp "go.source.hueristiq.com/http"
-	"go.source.hueristiq.com/http/method"
 	"go.source.hueristiq.com/http/status"
 	"go.source.hueristiq.com/url/parser"
 )
@@ -21,7 +20,7 @@ func (crawler *Crawler) robotsParsing(parsedURL *parser.URL) <-chan Result {
 
 		robotsURL := fmt.Sprintf("%s://%s/robots.txt", parsedURL.Scheme, parsedURL.Host)
 
-		res, err := hqgohttp.Request().Method(method.GET.String()).URL(robotsURL).Send()
+		res, err := hqgohttp.Get(robotsURL)
 		if err != nil {
 			result := Result{
 				Type:   ResultError,

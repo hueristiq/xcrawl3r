@@ -3,11 +3,13 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"os"
-	"path/filepath"
+	"sync"
 
 	"github.com/hueristiq/xcrawl3r/internal/configuration"
 	"github.com/hueristiq/xcrawl3r/internal/input"
+	"github.com/hueristiq/xcrawl3r/internal/output"
 	"github.com/hueristiq/xcrawl3r/pkg/xcrawl3r"
 	"github.com/logrusorgru/aurora/v4"
 	"github.com/spf13/pflag"
@@ -17,14 +19,13 @@ import (
 )
 
 var (
-	au = aurora.New(aurora.WithColors(true))
-
-	URLs         []string
-	URLsFilePath string
+	inputURLs             []string
+	inputURLsListFilePath string
 
 	domain            string
 	includeSubdomains bool
 
+	debug     bool
 	depth     int
 	headless  bool
 	headers   []string
@@ -38,22 +39,23 @@ var (
 	maxRandomDelay int
 	parallelism    int
 
-	debug      bool
-	monochrome bool
-	output     string
+	monochrome     bool
+	outputInJSONL  bool
+	outputFilePath string
+	silent         bool
+	verbose        bool
 
-	silent  bool
-	verbose bool
+	au = aurora.New(aurora.WithColors(true))
 )
 
 func init() {
-	// Handle command line arguments & flags
-	pflag.StringSliceVarP(&URLs, "url", "u", []string{}, "")
-	pflag.StringVarP(&URLsFilePath, "list", "l", "", "")
+	pflag.StringSliceVarP(&inputURLs, "url", "u", []string{}, "")
+	pflag.StringVarP(&inputURLsListFilePath, "list", "l", "", "")
 
 	pflag.StringVarP(&domain, "domain", "d", "", "")
 	pflag.BoolVar(&includeSubdomains, "include-subdomains", false, "")
 
+	pflag.BoolVar(&debug, "debug", false, "")
 	pflag.IntVar(&depth, "depth", 3, "")
 	pflag.BoolVar(&headless, "headless", false, "")
 	pflag.StringSliceVarP(&headers, "headers", "H", []string{}, "")
@@ -67,10 +69,9 @@ func init() {
 	pflag.IntVar(&maxRandomDelay, "max-random-delay", 1, "")
 	pflag.IntVarP(&parallelism, "parallelism", "p", 10, "")
 
-	pflag.BoolVar(&debug, "debug", false, "")
+	pflag.BoolVar(&outputInJSONL, "jsonl", false, "")
 	pflag.BoolVarP(&monochrome, "monochrome", "m", false, "")
-	pflag.StringVarP(&output, "output", "o", "", "")
-
+	pflag.StringVarP(&outputFilePath, "output", "o", "", "")
 	pflag.BoolVar(&silent, "silent", false, "")
 	pflag.BoolVarP(&verbose, "verbose", "v", false, "")
 
@@ -85,11 +86,15 @@ func init() {
 		h += " -u, --url string[]             target URL\n"
 		h += " -l, --list string                 target URLs list file path\n"
 
+		h += "\nTIP: For multiple input URLs use comma(,) separated value with `-u`,\n"
+		h += "     specify multiple `-u`, load from file with `-l` or load from stdin.\n"
+
 		h += "\nSCOPE:\n"
 		h += " -d, --domain string               domain to match URLs\n"
 		h += "     --include-subdomains bool     match subdomains' URLs\n"
 
 		h += "\nCONFIGURATION:\n"
+		h += "     --debug bool                  enable debug mode (default: false)\n"
 		h += "     --depth int                   maximum depth to crawl (default 3)\n"
 		h += "                                      TIP: set it to `0` for infinite recursion\n"
 		h += "     --headless bool               If true the browser will be displayed while crawling.\n"
@@ -112,11 +117,11 @@ func init() {
 		h += " -p, --parallelism int             number of concurrent URLs to process (default: 10)\n"
 
 		h += "\nOUTPUT:\n"
-		h += "     --debug bool                  enable debug mode (default: false)\n"
-		h += " -m, --monochrome bool             coloring: no colored output mode\n"
-		h += " -o, --output string               output file to write found URLs\n"
-		h += "     --silent bool                 display output URLs only\n"
-		h += " -v, --verbose bool                display verbose output\n"
+		h += "     --jsonl bool                    output URLs in JSONL format\n"
+		h += " -m, --monochrome bool             stdout monochrome output\n"
+		h += " -o, --output string               output URLs file path\n"
+		h += " -s, --silent bool                 stdout URLs only output\n"
+		h += " -v, --verbose bool                stdout verbose output\n"
 
 		logger.Info().Label("").Msg(h)
 		logger.Print().Msg("")
@@ -144,53 +149,79 @@ func main() {
 
 	var err error
 
-	// load input URLs from file
-	if URLsFilePath != "" {
-		var file *os.File
+	URLs := make(chan string, concurrency)
 
-		file, err = os.Open(URLsFilePath)
-		if err != nil {
-			logger.Error().Msg(err.Error())
-		}
+	go func() {
+		defer close(URLs)
 
-		scanner := bufio.NewScanner(file)
-
-		for scanner.Scan() {
-			URL := scanner.Text()
-
-			if URL != "" {
-				URLs = append(URLs, URL)
+		if len(inputURLs) > 0 {
+			for _, URL := range inputURLs {
+				URLs <- URL
 			}
 		}
 
-		if err = scanner.Err(); err != nil {
-			logger.Error().Msg(err.Error())
+		if inputURLsListFilePath != "" {
+			var file *os.File
+
+			file, err = os.Open(inputURLsListFilePath)
+			if err != nil {
+				logger.Error().Msg(err.Error())
+			}
+
+			scanner := bufio.NewScanner(file)
+
+			for scanner.Scan() {
+				URL := scanner.Text()
+
+				if URL != "" {
+					URLs <- URL
+				}
+			}
+
+			if err = scanner.Err(); err != nil {
+				logger.Error().Msg(err.Error())
+			}
+
+			file.Close()
 		}
-	}
 
-	// load input URLs from stdin
-	if input.HasStdin() {
-		scanner := bufio.NewScanner(os.Stdin)
+		if input.HasStdin() {
+			scanner := bufio.NewScanner(os.Stdin)
 
-		for scanner.Scan() {
-			URL := scanner.Text()
+			for scanner.Scan() {
+				URL := scanner.Text()
 
-			if URL != "" {
-				URLs = append(URLs, URL)
+				if URL != "" {
+					URLs <- URL
+				}
+			}
+
+			if err = scanner.Err(); err != nil {
+				logger.Error().Msg(err.Error())
 			}
 		}
+	}()
 
-		if err = scanner.Err(); err != nil {
-			logger.Error().Msg(err.Error())
-		}
+	outputs := []io.Writer{
+		os.Stdout,
 	}
 
-	logger.Info().Msgf("Crawling URLs for %s...", au.Underline(len(URLs)).Bold())
-	logger.Print().Msg("")
+	writer := output.NewWriter()
+
+	if outputInJSONL {
+		writer.SetFormatToJSONL()
+	}
+
+	var file *os.File
+
+	file, err = writer.CreateFile(outputFilePath)
+	if err != nil {
+		logger.Error().Msg(err.Error())
+	}
+
+	outputs = append(outputs, file)
 
 	cfg := &xcrawl3r.Configuration{
-		URLs: URLs,
-
 		Domain:            domain,
 		IncludeSubdomains: includeSubdomains,
 
@@ -215,49 +246,32 @@ func main() {
 		logger.Fatal().Msg(err.Error())
 	}
 
-	var writer *bufio.Writer
+	wg := &sync.WaitGroup{}
 
-	if output != "" {
-		directory := filepath.Dir(output)
+	for URL := range URLs {
+		wg.Add(1)
 
-		if _, err := os.Stat(directory); os.IsNotExist(err) {
-			if err = os.MkdirAll(directory, os.ModePerm); err != nil {
-				logger.Fatal().Msg(err.Error())
-			}
-		}
+		go func(URL string) {
+			defer wg.Done()
 
-		var file *os.File
+			for result := range crawler.Crawl(URL) {
+				for index := range outputs {
+					o := outputs[index]
 
-		file, err = os.OpenFile(output, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
-		if err != nil {
-			logger.Fatal().Msg(err.Error())
-		}
-
-		defer file.Close()
-
-		writer = bufio.NewWriter(file)
-	}
-
-	for URL := range crawler.Crawl() {
-		switch URL.Type {
-		case xcrawl3r.ResultError:
-			if verbose {
-				logger.Error().Msgf("%s: %s\n", URL.Source, URL.Error)
-			}
-		case xcrawl3r.ResultURL:
-			if verbose {
-				logger.Print().Msgf("[%s] %s", au.BrightBlue(URL.Source), URL.Value)
-			} else {
-				logger.Print().Msg(URL.Value)
-			}
-
-			if writer != nil {
-				fmt.Fprintln(writer, URL.Value)
-
-				if err := writer.Flush(); err != nil {
-					logger.Fatal().Msg(err.Error())
+					switch result.Type {
+					case xcrawl3r.ResultError:
+						if verbose {
+							logger.Error().Msgf("%s: %s", result.Source, result.Error)
+						}
+					case xcrawl3r.ResultURL:
+						if err := writer.Write(o, result); err != nil {
+							logger.Error().Msg(err.Error())
+						}
+					}
 				}
 			}
-		}
+		}(URL)
 	}
+
+	wg.Wait()
 }

@@ -20,25 +20,6 @@ import (
 )
 
 type Crawler struct {
-	URLs []string
-
-	Domain            string
-	IncludeSubdomains bool
-
-	Headless bool
-	Headers  []string
-	Proxies  []string
-	Render   bool
-	// Timeout   int
-	UserAgent string
-
-	// Concurrency    int
-	Delay int
-	// MaxRandomDelay int
-	Parallelism int
-
-	Debug bool
-
 	FileURLsRegex *regexp.Regexp
 
 	URLsNotToRequestRegex *regexp.Regexp
@@ -46,101 +27,74 @@ type Crawler struct {
 
 	PageCollector *colly.Collector
 	FileCollector *colly.Collector
+
+	cfg *Configuration
 }
 
-func (crawler *Crawler) Crawl() (results chan Result) {
+func (crawler *Crawler) Crawl(URL string) (results chan Result) {
 	results = make(chan Result)
 
 	go func() {
 		defer close(results)
 
-		URLsChannel := make(chan string, crawler.Parallelism)
+		seenURLs := &sync.Map{}
+
+		wg := &sync.WaitGroup{}
+
+		parsedURL, _ := up.Parse(URL)
+
+		wg.Add(1)
 
 		go func() {
-			defer close(URLsChannel)
+			defer wg.Done()
 
-			for _, URL := range crawler.URLs {
-				URLsChannel <- URL
+			for result := range crawler.sitemapParsing(parsedURL) {
+				_, loaded := seenURLs.LoadOrStore(result.Value, struct{}{})
+				if loaded {
+					continue
+				}
+
+				results <- result
 			}
 		}()
 
-		URLsWG := new(sync.WaitGroup)
+		wg.Add(1)
 
-		for range crawler.Parallelism {
-			URLsWG.Add(1)
+		go func() {
+			defer wg.Done()
 
-			go func() {
-				defer URLsWG.Done()
-
-				for seed := range URLsChannel {
-					parsedSeed, err := up.Parse(seed)
-					if err != nil {
-						continue
-					}
-
-					seenURLs := &sync.Map{}
-
-					wg := &sync.WaitGroup{}
-
-					wg.Add(1)
-
-					go func() {
-						defer wg.Done()
-
-						for URL := range crawler.sitemapParsing(parsedSeed) {
-							_, loaded := seenURLs.LoadOrStore(URL.Value, struct{}{})
-							if loaded {
-								continue
-							}
-
-							results <- URL
-						}
-					}()
-
-					wg.Add(1)
-
-					go func() {
-						defer wg.Done()
-
-						for URL := range crawler.robotsParsing(parsedSeed) {
-							_, loaded := seenURLs.LoadOrStore(URL, struct{}{})
-							if loaded {
-								continue
-							}
-
-							results <- URL
-						}
-					}()
-
-					wg.Add(1)
-
-					go func() {
-						defer wg.Done()
-
-						for URL := range crawler.pageCrawl(parsedSeed) {
-							_, loaded := seenURLs.LoadOrStore(URL, struct{}{})
-							if loaded {
-								continue
-							}
-
-							results <- URL
-						}
-					}()
-
-					wg.Wait()
+			for result := range crawler.robotsParsing(parsedURL) {
+				_, loaded := seenURLs.LoadOrStore(result, struct{}{})
+				if loaded {
+					continue
 				}
-			}()
-		}
 
-		URLsWG.Wait()
+				results <- result
+			}
+		}()
+
+		wg.Add(1)
+
+		go func() {
+			defer wg.Done()
+
+			for result := range crawler.pageCrawl(parsedURL) {
+				_, loaded := seenURLs.LoadOrStore(result, struct{}{})
+				if loaded {
+					continue
+				}
+
+				results <- result
+			}
+		}()
+
+		wg.Wait()
 	}()
 
 	return
 }
 
 type Configuration struct {
-	URLs []string
-
 	Depth int
 
 	Domain            string
@@ -159,32 +113,18 @@ type Configuration struct {
 	Parallelism    int
 
 	Debug bool
+
+	cfg *Configuration
 }
 
 var (
 	DefaultUserAgent = fmt.Sprintf("%s v%s (https://github.com/hueristiq/%s)", configuration.NAME, configuration.VERSION, configuration.NAME)
-	up               = parser.NewURLParser()
+	up               = parser.New(parser.WithDefaultScheme("https"))
 )
 
 func New(cfg *Configuration) (crawler *Crawler, err error) {
 	crawler = &Crawler{
-		Domain:            cfg.Domain,
-		IncludeSubdomains: cfg.IncludeSubdomains,
-		URLs:              cfg.URLs,
-
-		Headless: cfg.Headless,
-		Headers:  cfg.Headers,
-		Proxies:  cfg.Proxies,
-		Render:   cfg.Render,
-		// Timeout:   cfg.Timeout,
-		UserAgent: cfg.UserAgent,
-
-		// Concurrency:    cfg.Concurrency,
-		Delay: cfg.Delay,
-		// MaxRandomDelay: cfg.MaxRandomDelay,
-		Parallelism: cfg.Parallelism,
-
-		Debug: cfg.Debug,
+		cfg: cfg,
 	}
 
 	crawler.URLsRegex = extractor.New().CompileRegex()
@@ -197,15 +137,15 @@ func New(cfg *Configuration) (crawler *Crawler, err error) {
 		colly.Async(true),
 		colly.IgnoreRobotsTxt(),
 		colly.MaxDepth(cfg.Depth),
-		colly.AllowedDomains(crawler.Domain, "www."+crawler.Domain),
+		colly.AllowedDomains(crawler.cfg.Domain, "www."+crawler.cfg.Domain),
 	)
 
-	if crawler.IncludeSubdomains {
+	if crawler.cfg.IncludeSubdomains {
 		crawler.PageCollector.AllowedDomains = []string{}
 
 		crawler.PageCollector.URLFilters = []*regexp.Regexp{
 			extractor.New(
-				extractor.WithHostPattern(`(?:(?:\w+[.])*` + regexp.QuoteMeta(crawler.Domain) + extractor.ExtractorPortOptionalPattern + `)`),
+				extractor.WithHostPattern(`(?:(?:\w+[.])*` + regexp.QuoteMeta(crawler.cfg.Domain) + extractor.ExtractorPortOptionalPattern + `)`),
 			).CompileRegex(),
 		}
 	}
@@ -220,14 +160,14 @@ func New(cfg *Configuration) (crawler *Crawler, err error) {
 		return
 	}
 
-	if crawler.Debug {
+	if crawler.cfg.Debug {
 		crawler.PageCollector.SetDebugger(&debug.LogDebugger{})
 	}
 
-	if crawler.Headers != nil && len(crawler.Headers) > 0 {
+	if crawler.cfg.Headers != nil && len(crawler.cfg.Headers) > 0 {
 		crawler.PageCollector.OnRequest(func(request *colly.Request) {
-			for index := range crawler.Headers {
-				entry := crawler.Headers[index]
+			for index := range crawler.cfg.Headers {
+				entry := crawler.cfg.Headers[index]
 
 				var splitEntry []string
 
@@ -249,16 +189,16 @@ func New(cfg *Configuration) (crawler *Crawler, err error) {
 
 	extensions.Referer(crawler.PageCollector)
 
-	if crawler.UserAgent == "" {
+	if crawler.cfg.UserAgent == "" {
 		crawler.PageCollector.UserAgent = DefaultUserAgent
 	} else {
-		switch ua := strings.ToLower(crawler.UserAgent); {
+		switch ua := strings.ToLower(crawler.cfg.UserAgent); {
 		case strings.HasPrefix(ua, "mob"):
 			extensions.RandomMobileUserAgent(crawler.PageCollector)
 		case strings.HasPrefix(ua, "web"):
 			extensions.RandomUserAgent(crawler.PageCollector)
 		default:
-			crawler.PageCollector.UserAgent = crawler.UserAgent
+			crawler.PageCollector.UserAgent = crawler.cfg.UserAgent
 		}
 	}
 
@@ -293,8 +233,6 @@ func New(cfg *Configuration) (crawler *Crawler, err error) {
 				return
 			}
 
-			fmt.Println(parsedLocation)
-
 			if cfg.IncludeSubdomains && (parsedLocation.Domain.String() == cfg.Domain || strings.HasSuffix(parsedLocation.Domain.String(), "."+cfg.Domain)) {
 				return
 			}
@@ -312,10 +250,10 @@ func New(cfg *Configuration) (crawler *Crawler, err error) {
 
 	// Proxies
 	// NOTE: Must come AFTER .SetClient calls
-	if len(crawler.Proxies) > 0 {
+	if len(crawler.cfg.Proxies) > 0 {
 		var rrps colly.ProxyFunc
 
-		rrps, err = proxy.RoundRobinProxySwitcher(crawler.Proxies...)
+		rrps, err = proxy.RoundRobinProxySwitcher(crawler.cfg.Proxies...)
 		if err != nil {
 			return
 		}
