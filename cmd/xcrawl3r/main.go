@@ -212,14 +212,16 @@ func main() {
 		writer.SetFormatToJSONL()
 	}
 
-	var file *os.File
+	if outputFilePath != "" {
+		var file *os.File
 
-	file, err = writer.CreateFile(outputFilePath)
-	if err != nil {
-		logger.Error().Msg(err.Error())
+		file, err = writer.CreateFile(outputFilePath)
+		if err != nil {
+			logger.Error().Msg(err.Error())
+		}
+
+		outputs = append(outputs, file)
 	}
-
-	outputs = append(outputs, file)
 
 	cfg := &xcrawl3r.Configuration{
 		Domain:            domain,

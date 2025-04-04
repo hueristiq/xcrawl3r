@@ -4,6 +4,7 @@ import (
 	"encoding/xml"
 	"errors"
 	"io"
+	"strings"
 )
 
 type entry struct {
@@ -19,7 +20,9 @@ func (e *entry) GetType() EntryType {
 }
 
 func (e *entry) GetLocation() string {
-	return e.Location
+	location := strings.TrimSpace(e.Location)
+
+	return location
 }
 
 func (e *entry) GetChangeFrequency() EntryChangeFrequency {
