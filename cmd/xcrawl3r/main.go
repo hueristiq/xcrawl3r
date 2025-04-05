@@ -7,15 +7,15 @@ import (
 	"os"
 	"sync"
 
+	hqgologger "github.com/hueristiq/hq-go-logger"
+	"github.com/hueristiq/hq-go-logger/formatter"
+	"github.com/hueristiq/hq-go-logger/levels"
 	"github.com/hueristiq/xcrawl3r/internal/configuration"
 	"github.com/hueristiq/xcrawl3r/internal/input"
 	"github.com/hueristiq/xcrawl3r/internal/output"
 	"github.com/hueristiq/xcrawl3r/pkg/xcrawl3r"
 	"github.com/logrusorgru/aurora/v4"
 	"github.com/spf13/pflag"
-	"go.source.hueristiq.com/logger"
-	"go.source.hueristiq.com/logger/formatter"
-	"go.source.hueristiq.com/logger/levels"
 )
 
 var (
@@ -65,7 +65,7 @@ func init() {
 	pflag.BoolVarP(&verbose, "verbose", "v", false, "")
 
 	pflag.Usage = func() {
-		logger.Info().Label("").Msg(configuration.BANNER(au))
+		hqgologger.Info().Label("").Msg(configuration.BANNER(au))
 
 		h := "USAGE:\n"
 		h += fmt.Sprintf(" %s [OPTIONS]\n", configuration.NAME)
@@ -109,29 +109,29 @@ func init() {
 		h += " -s, --silent bool                 stdout URLs only output\n"
 		h += " -v, --verbose bool                stdout verbose output\n"
 
-		logger.Info().Label("").Msg(h)
-		logger.Print().Msg("")
+		hqgologger.Info().Label("").Msg(h)
+		hqgologger.Print().Msg("")
 	}
 
 	pflag.Parse()
 
-	logger.DefaultLogger.SetFormatter(formatter.NewConsoleFormatter(&formatter.ConsoleFormatterConfiguration{
+	hqgologger.DefaultLogger.SetFormatter(formatter.NewConsoleFormatter(&formatter.ConsoleFormatterConfiguration{
 		Colorize: !monochrome,
 	}))
 
 	if verbose {
-		logger.DefaultLogger.SetMaxLogLevel(levels.LevelDebug)
+		hqgologger.DefaultLogger.SetMaxLogLevel(levels.LevelDebug)
 	}
 
 	if silent {
-		logger.DefaultLogger.SetMaxLogLevel(levels.LevelSilent)
+		hqgologger.DefaultLogger.SetMaxLogLevel(levels.LevelSilent)
 	}
 
 	au = aurora.New(aurora.WithColors(!monochrome))
 }
 
 func main() {
-	logger.Info().Label("").Msg(configuration.BANNER(au))
+	hqgologger.Info().Label("").Msg(configuration.BANNER(au))
 
 	URLs := make(chan string, concurrency)
 
@@ -147,7 +147,7 @@ func main() {
 		if inputURLsListFilePath != "" {
 			file, err := os.Open(inputURLsListFilePath)
 			if err != nil {
-				logger.Error().Msg(err.Error())
+				hqgologger.Error().Msg(err.Error())
 			}
 
 			scanner := bufio.NewScanner(file)
@@ -161,7 +161,7 @@ func main() {
 			}
 
 			if err := scanner.Err(); err != nil {
-				logger.Error().Msg(err.Error())
+				hqgologger.Error().Msg(err.Error())
 			}
 
 			file.Close()
@@ -179,7 +179,7 @@ func main() {
 			}
 
 			if err := scanner.Err(); err != nil {
-				logger.Error().Msg(err.Error())
+				hqgologger.Error().Msg(err.Error())
 			}
 		}
 	}()
@@ -197,7 +197,7 @@ func main() {
 	if outputFilePath != "" {
 		file, err := writer.CreateFile(outputFilePath)
 		if err != nil {
-			logger.Error().Msg(err.Error())
+			hqgologger.Error().Msg(err.Error())
 		}
 
 		outputs = append(outputs, file)
@@ -217,7 +217,7 @@ func main() {
 
 	crawler, err := xcrawl3r.New(cfg)
 	if err != nil {
-		logger.Fatal().Msg(err.Error())
+		hqgologger.Fatal().Msg(err.Error())
 	}
 
 	wg := &sync.WaitGroup{}
@@ -236,11 +236,11 @@ func main() {
 						switch result.Type {
 						case xcrawl3r.ResultError:
 							if verbose {
-								logger.Error().Msgf("%s: %s", result.Source, result.Error)
+								hqgologger.Error().Msgf("%s: %s", result.Source, result.Error)
 							}
 						case xcrawl3r.ResultURL:
 							if err := writer.Write(output, result); err != nil {
-								logger.Error().Msg(err.Error())
+								hqgologger.Error().Msg(err.Error())
 							}
 						}
 					}
