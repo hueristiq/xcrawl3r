@@ -22,9 +22,7 @@ Unlike [`xurlfind3r`](https://github.com/hueristiq/xurlfind3r/) that doesn't int
 ## Features
 
 - Recursively spiders webpages for URLs
-- Parses URLs from `robots.txt`
-- Parses URLs from sitemaps
-- Parses URLs from files
+- Parses URLs from files (inluding sitemaps & `robots.txt`)
 - Cross-Platform (Windows, Linux & macOS)
 
 ## Installation
@@ -146,41 +144,43 @@ USAGE:
  xcrawl3r [OPTIONS]
 
 INPUT:
- -u, --url string[]             target URL
+ -u, --url string[]                target URL
  -l, --list string                 target URLs list file path
 
+TIP: For multiple input URLs use comma(,) separated value with `-u`,
+     specify multiple `-u`, load from file with `-l` or load from stdin.
+
 SCOPE:
- -d, --domain string               domain to match URLs
-     --include-subdomains bool     match subdomains' URLs
+ -d, --domain string[]             domain to match URLs
+
+TIP: For multiple domains use comma(,) separated value with `-d`
+     or specify multiple `-d`.
+
+     --include-subdomains bool     with domain(s), match subdomains' URLs
 
 CONFIGURATION:
-     --depth int                   maximum depth to crawl (default 3)
-                                      TIP: set it to `0` for infinite recursion
-     --headless bool               If true the browser will be displayed while crawling.
- -H, --headers string[]            custom header to include in requests
-                                      e.g. -H 'Referer: http://example.com/'
-                                      TIP: use multiple flag to set multiple headers
-     --proxy string[]              Proxy URL (e.g: http://127.0.0.1:8080)
-                                      TIP: use multiple flag to set multiple proxies
-     --render bool                 utilize a headless chrome instance to render pages
-     --timeout int                 time to wait for request in seconds (default: 10)
-     --user-agent string           User Agent to use (default: xcrawl3r v0.2.0 (https://github.com/hueristiq/xcrawl3r))
-                                      TIP: use `web` for a random web user-agent,
-                                      `mobile` for a random mobile user-agent,
-                                       or you can set your specific user-agent.
-
-RATE LIMIT:
- -c, --concurrency int             number of concurrent fetchers to use (default 10)
+     --depth int                   maximum depth to crawl, `0` for infinite (default: 1)
+ -c, --concurrency int             number of concurrent inputs to process (default: 10)
+ -p, --parallelism int             number of concurrent fetchers to use (default: 10)
      --delay int                   delay between each request in seconds
-     --max-random-delay int        maximux extra randomized delay added to `--dalay` (default: 1s)
- -p, --parallelism int             number of concurrent URLs to process (default: 10)
+ -H, --header string[]             custom header to include in requests
+
+TIP: For multiple headers use comma(,) separated value with `--header`
+     or specify multiple `--header`.
+
+     --timeout int                 time to wait for request in seconds (default: 10)
+     --proxy string[]              Proxy URL (e.g: http://127.0.0.1:8080)
+
+TIP: For multiple proxies use comma(,) separated value with `--proxy`
+     or specify multiple `--proxy`.
 
 OUTPUT:
-     --debug bool                  enable debug mode (default: false)
- -m, --monochrome bool             coloring: no colored output mode
- -o, --output string               output file to write found URLs
-     --silent bool                 display output URLs only
- -v, --verbose bool                display verbose output
+     --debug bool                  enable debug mode
+     --jsonl bool                  output URLs in JSONL format
+ -m, --monochrome bool             stdout monochrome output
+ -o, --output string               output URLs file path
+ -s, --silent bool                 stdout URLs only output
+ -v, --verbose bool                stdout verbose output
 
 ```
 
