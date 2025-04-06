@@ -36,8 +36,6 @@ func (crawler *Crawler) Crawl(targetURL string) <-chan Result {
 	results := make(chan Result)
 
 	go func() {
-		defer close(results)
-
 		seenURLs := &sync.Map{}
 
 		crawler.PageCollector.OnRequest(func(request *colly.Request) {
@@ -280,8 +278,10 @@ func (crawler *Crawler) Crawl(targetURL string) <-chan Result {
 			}
 		}
 
-		crawler.FileCollector.Wait()
 		crawler.PageCollector.Wait()
+		crawler.FileCollector.Wait()
+
+		close(results)
 	}()
 
 	return results
