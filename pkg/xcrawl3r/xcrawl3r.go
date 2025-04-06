@@ -68,7 +68,7 @@ func (crawler *Crawler) Crawl(URL string) <-chan Result {
 						Source: "page",
 						Error:  err,
 					}
-		
+
 					results <- result
 				}
 
