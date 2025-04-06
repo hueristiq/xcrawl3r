@@ -422,6 +422,15 @@ func (crawler *Crawler) validate(URL string) (valid bool) {
 	return
 }
 
+type Result struct {
+	Type   ResultType
+	Source string
+	Value  string
+	Error  error
+}
+
+type ResultType int
+
 type Configuration struct {
 	Domains           []string
 	IncludeSubdomains bool
@@ -436,6 +445,11 @@ type Configuration struct {
 
 var (
 	up = parser.New(parser.WithDefaultScheme("https"))
+)
+
+const (
+	ResultURL ResultType = iota
+	ResultError
 )
 
 func New(cfg *Configuration) (crawler *Crawler, err error) {
