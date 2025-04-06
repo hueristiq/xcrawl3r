@@ -73,15 +73,29 @@ func (crawler *Crawler) Crawl(target string) <-chan Result {
 			if match := crawler.fileURLsNotToRequextExtRegex.MatchString(ext); match {
 				request.Abort()
 
+				wg.Done()
+
 				return
 			}
 
 			if match := crawler.fileURLsToRequestExtRegex.MatchString(ext); match {
 				wg.Add(1)
 
-				f.Visit(request.URL.String())
+				if err := f.Visit(request.URL.String()); err != nil {
+					result := Result{
+						Type:   ResultError,
+						Source: "page:href",
+						Error:  err,
+					}
+
+					results <- result
+
+					wg.Done()
+				}
 
 				request.Abort()
+
+				wg.Done()
 
 				return
 			}
@@ -122,7 +136,17 @@ func (crawler *Crawler) Crawl(target string) <-chan Result {
 
 			wg.Add(1)
 
-			e.Request.Visit(URL)
+			if err := e.Request.Visit(URL); err != nil {
+				result := Result{
+					Type:   ResultError,
+					Source: "page:href",
+					Error:  err,
+				}
+
+				results <- result
+
+				wg.Done()
+			}
 		})
 
 		p.OnHTML("[src]", func(e *colly.HTMLElement) {
@@ -144,14 +168,34 @@ func (crawler *Crawler) Crawl(target string) <-chan Result {
 
 			wg.Add(1)
 
-			e.Request.Visit(URL)
+			if err := e.Request.Visit(URL); err != nil {
+				result := Result{
+					Type:   ResultError,
+					Source: "page:href",
+					Error:  err,
+				}
+
+				results <- result
+
+				wg.Done()
+			}
 		})
 
 		f.OnRequest(func(request *colly.Request) {
 			if strings.Contains(request.URL.String(), ".min.") {
 				wg.Add(1)
 
-				f.Visit(strings.ReplaceAll(request.URL.String(), ".min.", "."))
+				if err := f.Visit(strings.ReplaceAll(request.URL.String(), ".min.", ".")); err != nil {
+					result := Result{
+						Type:   ResultError,
+						Source: "page:href",
+						Error:  err,
+					}
+
+					results <- result
+
+					wg.Done()
+				}
 			}
 		})
 
@@ -199,7 +243,17 @@ func (crawler *Crawler) Crawl(target string) <-chan Result {
 
 				wg.Add(1)
 
-				p.Visit(URL)
+				if err := p.Visit(URL); err != nil {
+					result := Result{
+						Type:   ResultError,
+						Source: "page:href",
+						Error:  err,
+					}
+
+					results <- result
+
+					wg.Done()
+				}
 			}
 
 			wg.Done()
@@ -208,7 +262,17 @@ func (crawler *Crawler) Crawl(target string) <-chan Result {
 		for i := range targets {
 			wg.Add(1)
 
-			p.Visit(targets[i])
+			if err := p.Visit(targets[i]); err != nil {
+				result := Result{
+					Type:   ResultError,
+					Source: "page:href",
+					Error:  err,
+				}
+
+				results <- result
+
+				wg.Done()
+			}
 		}
 
 		p.Wait()
