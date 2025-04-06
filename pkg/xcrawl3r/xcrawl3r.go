@@ -8,6 +8,7 @@ import (
 	"path"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gocolly/colly/v2"
@@ -32,70 +33,39 @@ type Crawler struct {
 	fileCollectorStorage *storage.InMemoryStorage
 }
 
-func (crawler *Crawler) Crawl(targetURL string) <-chan Result {
+func (crawler *Crawler) Crawl(target string) <-chan Result {
 	results := make(chan Result)
-
-	p, f, err := crawler.Collectors()
-	if err != nil {
-		result := Result{
-			Type:   ResultError,
-			Source: "page:href",
-			Error:  err,
-		}
-
-		results <- result
-
-		close(results)
-
-		return results
-	}
-
-	parsedTargetURL, err := up.Parse(targetURL)
-	if err != nil {
-		result := Result{
-			Type:   ResultError,
-			Source: "page:href",
-			Error:  err,
-		}
-
-		results <- result
-
-		close(results)
-
-		return results
-	}
-
-	targetURLs := []string{
-		parsedTargetURL.String(),
-	}
-
-	robotsTXTURL := fmt.Sprintf("%s://%s/robots.txt", parsedTargetURL.Scheme, parsedTargetURL.Host)
-
-	targetURLs = append(targetURLs, robotsTXTURL)
-
-	sitemaps := []string{
-		"/sitemap.xml",
-		"/sitemap_news.xml",
-		"/sitemap_index.xml",
-		"/sitemap-index.xml",
-		"/sitemapindex.xml",
-		"/sitemap-news.xml",
-		"/post-sitemap.xml",
-		"/page-sitemap.xml",
-		"/portfolio-sitemap.xml",
-		"/home_slider-sitemap.xml",
-		"/category-sitemap.xml",
-		"/author-sitemap.xml",
-	}
-
-	for _, sitemap := range sitemaps {
-		sitemapURL := fmt.Sprintf("%s://%s%s", parsedTargetURL.Scheme, parsedTargetURL.Host, sitemap)
-
-		targetURLs = append(targetURLs, sitemapURL)
-	}
 
 	go func() {
 		defer close(results)
+
+		targets, err := crawler.targets(target)
+		if err != nil {
+			result := Result{
+				Type:   ResultError,
+				Source: "page:href",
+				Error:  err,
+			}
+
+			results <- result
+
+			return
+		}
+
+		p, f, err := crawler.collectors()
+		if err != nil {
+			result := Result{
+				Type:   ResultError,
+				Source: "page:href",
+				Error:  err,
+			}
+
+			results <- result
+
+			return
+		}
+
+		wg := &sync.WaitGroup{}
 
 		p.OnRequest(func(request *colly.Request) {
 			ext := path.Ext(request.URL.Path)
@@ -107,6 +77,8 @@ func (crawler *Crawler) Crawl(targetURL string) <-chan Result {
 			}
 
 			if match := crawler.fileURLsToRequestExtRegex.MatchString(ext); match {
+				wg.Add(1)
+
 				f.Visit(request.URL.String())
 
 				request.Abort()
@@ -123,6 +95,12 @@ func (crawler *Crawler) Crawl(targetURL string) <-chan Result {
 			}
 
 			results <- result
+
+			wg.Done()
+		})
+
+		p.OnResponse(func(response *colly.Response) {
+			wg.Done()
 		})
 
 		p.OnHTML("[href]", func(e *colly.HTMLElement) {
@@ -130,7 +108,7 @@ func (crawler *Crawler) Crawl(targetURL string) <-chan Result {
 
 			URL := e.Request.AbsoluteURL(link)
 
-			if valid := crawler.Validate(URL); !valid {
+			if valid := crawler.validate(URL); !valid {
 				return
 			}
 
@@ -142,6 +120,8 @@ func (crawler *Crawler) Crawl(targetURL string) <-chan Result {
 
 			results <- result
 
+			wg.Add(1)
+
 			e.Request.Visit(URL)
 		})
 
@@ -150,7 +130,7 @@ func (crawler *Crawler) Crawl(targetURL string) <-chan Result {
 
 			URL := e.Request.AbsoluteURL(link)
 
-			if valid := crawler.Validate(URL); !valid {
+			if valid := crawler.validate(URL); !valid {
 				return
 			}
 
@@ -162,11 +142,15 @@ func (crawler *Crawler) Crawl(targetURL string) <-chan Result {
 
 			results <- result
 
+			wg.Add(1)
+
 			e.Request.Visit(URL)
 		})
 
 		f.OnRequest(func(request *colly.Request) {
 			if strings.Contains(request.URL.String(), ".min.") {
+				wg.Add(1)
+
 				f.Visit(strings.ReplaceAll(request.URL.String(), ".min.", "."))
 			}
 		})
@@ -179,6 +163,8 @@ func (crawler *Crawler) Crawl(targetURL string) <-chan Result {
 			}
 
 			results <- result
+
+			wg.Done()
 		})
 
 		f.OnResponse(func(response *colly.Response) {
@@ -199,7 +185,7 @@ func (crawler *Crawler) Crawl(targetURL string) <-chan Result {
 			for _, link := range links {
 				URL := response.Request.AbsoluteURL(link)
 
-				if valid := crawler.Validate(URL); !valid {
+				if valid := crawler.validate(URL); !valid {
 					continue
 				}
 
@@ -211,28 +197,69 @@ func (crawler *Crawler) Crawl(targetURL string) <-chan Result {
 
 				results <- result
 
+				wg.Add(1)
+
 				p.Visit(URL)
 			}
+
+			wg.Done()
 		})
 
-		for i := range targetURLs {
-			p.Visit(targetURLs[i])
+		for i := range targets {
+			wg.Add(1)
+
+			p.Visit(targets[i])
 		}
 
-		f.Wait()
 		p.Wait()
+		f.Wait()
+		wg.Wait()
 	}()
 
 	return results
 }
 
-func (crawler *Crawler) Validate(URL string) (valid bool) {
-	valid = crawler._URLFilterRegex.MatchString(URL)
+func (crawler *Crawler) targets(target string) (targets []string, err error) {
+	targets = []string{}
+
+	var parsedTargetURL *parser.URL
+
+	parsedTargetURL, err = up.Parse(target)
+	if err != nil {
+		return
+	}
+
+	targets = append(targets, parsedTargetURL.String())
+
+	robotsTXTURL := fmt.Sprintf("%s://%s/robots.txt", parsedTargetURL.Scheme, parsedTargetURL.Host)
+
+	targets = append(targets, robotsTXTURL)
+
+	sitemaps := []string{
+		"/sitemap.xml",
+		"/sitemap_news.xml",
+		"/sitemap_index.xml",
+		"/sitemap-index.xml",
+		"/sitemapindex.xml",
+		"/sitemap-news.xml",
+		"/post-sitemap.xml",
+		"/page-sitemap.xml",
+		"/portfolio-sitemap.xml",
+		"/home_slider-sitemap.xml",
+		"/category-sitemap.xml",
+		"/author-sitemap.xml",
+	}
+
+	for _, sitemap := range sitemaps {
+		sitemapURL := fmt.Sprintf("%s://%s%s", parsedTargetURL.Scheme, parsedTargetURL.Host, sitemap)
+
+		targets = append(targets, sitemapURL)
+	}
 
 	return
 }
 
-func (crawler *Crawler) Collectors() (p, f *colly.Collector, err error) {
+func (crawler *Crawler) collectors() (p, f *colly.Collector, err error) {
 	p = colly.NewCollector(
 		colly.Async(true),
 		colly.IgnoreRobotsTxt(),
@@ -321,6 +348,12 @@ func (crawler *Crawler) Collectors() (p, f *colly.Collector, err error) {
 
 	f.ID = 2
 	f.SetStorage(crawler.fileCollectorStorage)
+
+	return
+}
+
+func (crawler *Crawler) validate(URL string) (valid bool) {
+	valid = crawler._URLFilterRegex.MatchString(URL)
 
 	return
 }
