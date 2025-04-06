@@ -35,7 +35,53 @@ type Crawler struct {
 func (crawler *Crawler) Crawl(targetURL string) <-chan Result {
 	results := make(chan Result)
 
+	parsedTargetURL, err := up.Parse(targetURL)
+	if err != nil {
+		result := Result{
+			Type:   ResultError,
+			Source: "page:href",
+			Error:  err,
+		}
+
+		results <- result
+
+		close(results)
+
+		return results
+	}
+
+	targetURLs := []string{
+		parsedTargetURL.String(),
+	}
+
+	robotsTXTURL := fmt.Sprintf("%s://%s/robots.txt", parsedTargetURL.Scheme, parsedTargetURL.Host)
+
+	targetURLs = append(targetURLs, robotsTXTURL)
+
+	sitemaps := []string{
+		"/sitemap.xml",
+		"/sitemap_news.xml",
+		"/sitemap_index.xml",
+		"/sitemap-index.xml",
+		"/sitemapindex.xml",
+		"/sitemap-news.xml",
+		"/post-sitemap.xml",
+		"/page-sitemap.xml",
+		"/portfolio-sitemap.xml",
+		"/home_slider-sitemap.xml",
+		"/category-sitemap.xml",
+		"/author-sitemap.xml",
+	}
+
+	for _, sitemap := range sitemaps {
+		sitemapURL := fmt.Sprintf("%s://%s%s", parsedTargetURL.Scheme, parsedTargetURL.Host, sitemap)
+
+		targetURLs = append(targetURLs, sitemapURL)
+	}
+
 	go func() {
+		defer close(results)
+
 		seenURLs := &sync.Map{}
 
 		crawler.PageCollector.OnRequest(func(request *colly.Request) {
@@ -224,48 +270,6 @@ func (crawler *Crawler) Crawl(targetURL string) <-chan Result {
 			}
 		})
 
-		parsedTargetURL, err := up.Parse(targetURL)
-		if err != nil {
-			result := Result{
-				Type:   ResultError,
-				Source: "page:href",
-				Error:  err,
-			}
-
-			results <- result
-
-			return
-		}
-
-		targetURLs := []string{
-			parsedTargetURL.String(),
-		}
-
-		robotsTXTURL := fmt.Sprintf("%s://%s/robots.txt", parsedTargetURL.Scheme, parsedTargetURL.Host)
-
-		targetURLs = append(targetURLs, robotsTXTURL)
-
-		sitemaps := []string{
-			"/sitemap.xml",
-			"/sitemap_news.xml",
-			"/sitemap_index.xml",
-			"/sitemap-index.xml",
-			"/sitemapindex.xml",
-			"/sitemap-news.xml",
-			"/post-sitemap.xml",
-			"/page-sitemap.xml",
-			"/portfolio-sitemap.xml",
-			"/home_slider-sitemap.xml",
-			"/category-sitemap.xml",
-			"/author-sitemap.xml",
-		}
-
-		for _, sitemap := range sitemaps {
-			sitemapURL := fmt.Sprintf("%s://%s%s", parsedTargetURL.Scheme, parsedTargetURL.Host, sitemap)
-
-			targetURLs = append(targetURLs, sitemapURL)
-		}
-
 		for i := range targetURLs {
 			if err := crawler.PageCollector.Visit(targetURLs[i]); err != nil {
 				result := Result{
@@ -280,8 +284,6 @@ func (crawler *Crawler) Crawl(targetURL string) <-chan Result {
 
 		crawler.FileCollector.Wait()
 		crawler.PageCollector.Wait()
-
-		close(results)
 	}()
 
 	return results
