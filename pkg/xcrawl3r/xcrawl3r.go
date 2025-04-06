@@ -63,7 +63,13 @@ func (crawler *Crawler) Crawl(URL string) <-chan Result {
 
 			if match := crawler.URLsToFilesRegex.MatchString(request.URL.String()); match {
 				if err := crawler.FileCollector.Visit(request.URL.String()); err != nil {
-					return
+					result := Result{
+						Type:   ResultError,
+						Source: "page",
+						Error:  err,
+					}
+		
+					results <- result
 				}
 
 				request.Abort()
@@ -150,8 +156,6 @@ func (crawler *Crawler) Crawl(URL string) <-chan Result {
 					}
 
 					results <- result
-
-					return
 				}
 
 				return
@@ -175,7 +179,13 @@ func (crawler *Crawler) Crawl(URL string) <-chan Result {
 				js := strings.ReplaceAll(request.URL.String(), ".min.", ".")
 
 				if err := crawler.FileCollector.Visit(js); err != nil {
-					return
+					result := Result{
+						Type:   ResultError,
+						Source: "page",
+						Error:  err,
+					}
+
+					results <- result
 				}
 			}
 		})
