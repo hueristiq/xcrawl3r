@@ -93,15 +93,7 @@ func (crawler *Crawler) Crawl(targetURL string) <-chan Result {
 			}
 
 			if match := crawler.URLsToFilesRegex.MatchString(ext); match {
-				if err := crawler.FileCollector.Visit(request.URL.String()); err != nil {
-					result := Result{
-						Type:   ResultError,
-						Source: "page",
-						Error:  err,
-					}
-
-					results <- result
-				}
+				crawler.FileCollector.Visit(request.URL.String())
 
 				request.Abort()
 
@@ -141,15 +133,7 @@ func (crawler *Crawler) Crawl(targetURL string) <-chan Result {
 
 			results <- result
 
-			if err := e.Request.Visit(URL); err != nil {
-				result := Result{
-					Type:   ResultError,
-					Source: "page:href",
-					Error:  err,
-				}
-
-				results <- result
-			}
+			e.Request.Visit(URL)
 		})
 
 		crawler.PageCollector.OnHTML("[src]", func(e *colly.HTMLElement) {
@@ -174,30 +158,12 @@ func (crawler *Crawler) Crawl(targetURL string) <-chan Result {
 
 			results <- result
 
-			if err := e.Request.Visit(URL); err != nil {
-				result := Result{
-					Type:   ResultError,
-					Source: "page:src",
-					Error:  err,
-				}
-
-				results <- result
-			}
+			e.Request.Visit(URL)
 		})
 
 		crawler.FileCollector.OnRequest(func(request *colly.Request) {
 			if strings.Contains(request.URL.String(), ".min.") {
-				js := strings.ReplaceAll(request.URL.String(), ".min.", ".")
-
-				if err := crawler.FileCollector.Visit(js); err != nil {
-					result := Result{
-						Type:   ResultError,
-						Source: "page",
-						Error:  err,
-					}
-
-					results <- result
-				}
+				crawler.FileCollector.Visit(strings.ReplaceAll(request.URL.String(), ".min.", "."))
 			}
 		})
 
@@ -246,28 +212,12 @@ func (crawler *Crawler) Crawl(targetURL string) <-chan Result {
 
 				results <- result
 
-				if err := crawler.PageCollector.Visit(URL); err != nil {
-					result := Result{
-						Type:   ResultError,
-						Source: "file:" + ext,
-						Error:  err,
-					}
-
-					results <- result
-				}
+				crawler.PageCollector.Visit(URL)
 			}
 		})
 
 		for i := range targetURLs {
-			if err := crawler.PageCollector.Visit(targetURLs[i]); err != nil {
-				result := Result{
-					Type:   ResultError,
-					Source: "page",
-					Error:  err,
-				}
-
-				results <- result
-			}
+			crawler.PageCollector.Visit(targetURLs[i])
 		}
 
 		crawler.FileCollector.Wait()
