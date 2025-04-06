@@ -8,7 +8,6 @@ import (
 	"path"
 	"regexp"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/gocolly/colly/v2"
@@ -23,16 +22,33 @@ import (
 type Crawler struct {
 	cfg *Configuration
 
-	URLsExtractorRegex    *regexp.Regexp
-	URLFilterRegex        *regexp.Regexp
-	URLsNotToRequestRegex *regexp.Regexp
-	URLsToFilesRegex      *regexp.Regexp
-	PageCollector         *colly.Collector
-	FileCollector         *colly.Collector
+	_URLFilterRegex    *regexp.Regexp
+	_URLExtractorRegex *regexp.Regexp
+
+	fileURLsToRequestExtRegex    *regexp.Regexp
+	fileURLsNotToRequextExtRegex *regexp.Regexp
+
+	pageCollectorStorage *storage.InMemoryStorage
+	fileCollectorStorage *storage.InMemoryStorage
 }
 
 func (crawler *Crawler) Crawl(targetURL string) <-chan Result {
 	results := make(chan Result)
+
+	p, f, err := crawler.Collectors()
+	if err != nil {
+		result := Result{
+			Type:   ResultError,
+			Source: "page:href",
+			Error:  err,
+		}
+
+		results <- result
+
+		close(results)
+
+		return results
+	}
 
 	parsedTargetURL, err := up.Parse(targetURL)
 	if err != nil {
@@ -81,19 +97,17 @@ func (crawler *Crawler) Crawl(targetURL string) <-chan Result {
 	go func() {
 		defer close(results)
 
-		seenURLs := &sync.Map{}
-
-		crawler.PageCollector.OnRequest(func(request *colly.Request) {
+		p.OnRequest(func(request *colly.Request) {
 			ext := path.Ext(request.URL.Path)
 
-			if match := crawler.URLsNotToRequestRegex.MatchString(ext); match {
+			if match := crawler.fileURLsNotToRequextExtRegex.MatchString(ext); match {
 				request.Abort()
 
 				return
 			}
 
-			if match := crawler.URLsToFilesRegex.MatchString(ext); match {
-				crawler.FileCollector.Visit(request.URL.String())
+			if match := crawler.fileURLsToRequestExtRegex.MatchString(ext); match {
+				f.Visit(request.URL.String())
 
 				request.Abort()
 
@@ -101,7 +115,7 @@ func (crawler *Crawler) Crawl(targetURL string) <-chan Result {
 			}
 		})
 
-		crawler.PageCollector.OnError(func(_ *colly.Response, err error) {
+		p.OnError(func(_ *colly.Response, err error) {
 			result := Result{
 				Type:   ResultError,
 				Source: "page",
@@ -111,17 +125,12 @@ func (crawler *Crawler) Crawl(targetURL string) <-chan Result {
 			results <- result
 		})
 
-		crawler.PageCollector.OnHTML("[href]", func(e *colly.HTMLElement) {
+		p.OnHTML("[href]", func(e *colly.HTMLElement) {
 			link := e.Attr("href")
 
 			URL := e.Request.AbsoluteURL(link)
 
 			if valid := crawler.Validate(URL); !valid {
-				return
-			}
-
-			_, loaded := seenURLs.LoadOrStore(URL, struct{}{})
-			if loaded {
 				return
 			}
 
@@ -136,17 +145,12 @@ func (crawler *Crawler) Crawl(targetURL string) <-chan Result {
 			e.Request.Visit(URL)
 		})
 
-		crawler.PageCollector.OnHTML("[src]", func(e *colly.HTMLElement) {
+		p.OnHTML("[src]", func(e *colly.HTMLElement) {
 			link := e.Attr("src")
 
 			URL := e.Request.AbsoluteURL(link)
 
 			if valid := crawler.Validate(URL); !valid {
-				return
-			}
-
-			_, loaded := seenURLs.LoadOrStore(URL, struct{}{})
-			if loaded {
 				return
 			}
 
@@ -161,13 +165,13 @@ func (crawler *Crawler) Crawl(targetURL string) <-chan Result {
 			e.Request.Visit(URL)
 		})
 
-		crawler.FileCollector.OnRequest(func(request *colly.Request) {
+		f.OnRequest(func(request *colly.Request) {
 			if strings.Contains(request.URL.String(), ".min.") {
-				crawler.FileCollector.Visit(strings.ReplaceAll(request.URL.String(), ".min.", "."))
+				f.Visit(strings.ReplaceAll(request.URL.String(), ".min.", "."))
 			}
 		})
 
-		crawler.FileCollector.OnError(func(_ *colly.Response, err error) {
+		f.OnError(func(_ *colly.Response, err error) {
 			result := Result{
 				Type:   ResultError,
 				Source: "page",
@@ -177,7 +181,7 @@ func (crawler *Crawler) Crawl(targetURL string) <-chan Result {
 			results <- result
 		})
 
-		crawler.FileCollector.OnResponse(func(response *colly.Response) {
+		f.OnResponse(func(response *colly.Response) {
 			ext := path.Ext(response.Request.URL.Path)
 
 			body := string(response.Body)
@@ -190,17 +194,12 @@ func (crawler *Crawler) Crawl(targetURL string) <-chan Result {
 
 			body = replacer.Replace(body)
 
-			links := crawler.URLsExtractorRegex.FindAllString(body, -1)
+			links := crawler._URLExtractorRegex.FindAllString(body, -1)
 
 			for _, link := range links {
 				URL := response.Request.AbsoluteURL(link)
 
 				if valid := crawler.Validate(URL); !valid {
-					continue
-				}
-
-				_, loaded := seenURLs.LoadOrStore(URL, struct{}{})
-				if loaded {
 					continue
 				}
 
@@ -212,22 +211,115 @@ func (crawler *Crawler) Crawl(targetURL string) <-chan Result {
 
 				results <- result
 
-				crawler.PageCollector.Visit(URL)
+				p.Visit(URL)
 			}
 		})
 
 		for i := range targetURLs {
-			crawler.PageCollector.Visit(targetURLs[i])
+			p.Visit(targetURLs[i])
 		}
 
-		crawler.PageCollector.Wait()
+		p.Wait()
 	}()
 
 	return results
 }
 
 func (crawler *Crawler) Validate(URL string) (valid bool) {
-	valid = crawler.URLFilterRegex.MatchString(URL)
+	valid = crawler._URLFilterRegex.MatchString(URL)
+
+	return
+}
+
+func (crawler *Crawler) Collectors() (p, f *colly.Collector, err error) {
+	p = colly.NewCollector(
+		colly.Async(true),
+		colly.IgnoreRobotsTxt(),
+		colly.URLFilters(crawler._URLFilterRegex),
+		colly.MaxDepth(crawler.cfg.Depth),
+	)
+
+	if err = p.Limit(&colly.LimitRule{
+		DomainGlob:  "*",
+		Parallelism: crawler.cfg.Parallelism,
+		RandomDelay: time.Duration(crawler.cfg.Delay) * time.Second,
+	}); err != nil {
+		return
+	}
+
+	if len(crawler.cfg.Headers) > 0 {
+		p.OnRequest(func(request *colly.Request) {
+			for index := range crawler.cfg.Headers {
+				entry := crawler.cfg.Headers[index]
+
+				var splitEntry []string
+
+				switch {
+				case strings.Contains(entry, ": "):
+					splitEntry = strings.SplitN(entry, ": ", 2)
+				case strings.Contains(entry, ":"):
+					splitEntry = strings.SplitN(entry, ":", 2)
+				default:
+					continue
+				}
+
+				header := strings.TrimSpace(splitEntry[0])
+				value := splitEntry[1]
+
+				request.Headers.Set(header, value)
+			}
+		})
+	}
+
+	extensions.Referer(p)
+
+	HTTPTransport := &http.Transport{
+		DialContext: (&net.Dialer{
+			Timeout:   time.Duration(crawler.cfg.Timeout) * time.Second,
+			KeepAlive: time.Duration(crawler.cfg.Timeout) * time.Second,
+		}).DialContext,
+		MaxIdleConns:        100, // Golang default is 100
+		MaxConnsPerHost:     1000,
+		IdleConnTimeout:     time.Duration(crawler.cfg.Timeout) * time.Second,
+		TLSHandshakeTimeout: time.Duration(crawler.cfg.Timeout) * time.Second,
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true,
+			Renegotiation:      tls.RenegotiateOnceAsClient,
+		},
+	}
+
+	HTTPClient := &http.Client{
+		Transport: HTTPTransport,
+	}
+
+	// NOTE: Must come BEFORE .SetClient calls
+	p.SetClient(HTTPClient)
+
+	// Proxies
+	// NOTE: Must come AFTER .SetClient calls
+	if len(crawler.cfg.Proxies) > 0 {
+		var rrps colly.ProxyFunc
+
+		rrps, err = proxy.RoundRobinProxySwitcher(crawler.cfg.Proxies...)
+		if err != nil {
+			return
+		}
+
+		p.SetProxyFunc(rrps)
+	}
+
+	if crawler.cfg.Debug {
+		p.SetDebugger(&debug.LogDebugger{})
+	}
+
+	f = p.Clone()
+	f.URLFilters = nil
+
+	p.ID = 1
+	p.SetStorage(crawler.pageCollectorStorage)
+
+	f.ID = 2
+	f.SetStorage(crawler.fileCollectorStorage)
 
 	return
 }
@@ -237,9 +329,9 @@ type Configuration struct {
 	IncludeSubdomains bool
 	Depth             int
 	Parallelism       int
-	Delay             int // seconds
+	Delay             int
 	Headers           []string
-	Timeout           int // seconds
+	Timeout           int
 	Proxies           []string
 	Debug             bool
 }
@@ -252,8 +344,6 @@ func New(cfg *Configuration) (crawler *Crawler, err error) {
 	crawler = &Crawler{
 		cfg: cfg,
 	}
-
-	crawler.URLsExtractorRegex = extractor.New().CompileRegex()
 
 	URLFilterRegexPattern := `https?://([a-z0-9-]+\.)(?:[a-z0-9-]+\.)+[a-z]{2,}(:\d+)?(?:/[^?\s#]*)?(?:\?[^#\s]*)?(?:#[^\s]*)?`
 
@@ -279,98 +369,14 @@ func New(cfg *Configuration) (crawler *Crawler, err error) {
 		}
 	}
 
-	crawler.URLFilterRegex = regexp.MustCompile(URLFilterRegexPattern)
-	crawler.URLsNotToRequestRegex = regexp.MustCompile(`\.(apng|bpm|png|bmp|gif|heif|ico|cur|jpg|jpeg|jfif|pjp|pjpeg|psd|raw|svg|tif|tiff|webp|xbm|3gp|aac|flac|mpg|mpeg|mp3|mp4|m4a|m4v|m4p|oga|ogg|ogv|mov|wav|webm|eot|woff|woff2|ttf|otf)$`)
-	crawler.URLsToFilesRegex = regexp.MustCompile(`\.(css|js|json|xml|csv|txt)$`)
+	crawler._URLFilterRegex = regexp.MustCompile(URLFilterRegexPattern)
+	crawler._URLExtractorRegex = extractor.New().CompileRegex()
 
-	crawler.PageCollector = colly.NewCollector(
-		colly.Async(true),
-		colly.IgnoreRobotsTxt(),
-		colly.URLFilters(crawler.URLFilterRegex),
-		colly.MaxDepth(cfg.Depth),
-	)
+	crawler.fileURLsToRequestExtRegex = regexp.MustCompile(`\.(css|js|json|xml|csv|txt)$`)
+	crawler.fileURLsNotToRequextExtRegex = regexp.MustCompile(`\.(apng|bpm|png|bmp|gif|heif|ico|cur|jpg|jpeg|jfif|pjp|pjpeg|psd|raw|svg|tif|tiff|webp|xbm|3gp|aac|flac|mpg|mpeg|mp3|mp4|m4a|m4v|m4p|oga|ogg|ogv|mov|wav|webm|eot|woff|woff2|ttf|otf)$`)
 
-	if err = crawler.PageCollector.Limit(&colly.LimitRule{
-		DomainGlob:  "*",
-		Parallelism: cfg.Parallelism,
-		RandomDelay: time.Duration(cfg.Delay) * time.Second,
-	}); err != nil {
-		return
-	}
-
-	if len(crawler.cfg.Headers) > 0 {
-		crawler.PageCollector.OnRequest(func(request *colly.Request) {
-			for index := range crawler.cfg.Headers {
-				entry := crawler.cfg.Headers[index]
-
-				var splitEntry []string
-
-				switch {
-				case strings.Contains(entry, ": "):
-					splitEntry = strings.SplitN(entry, ": ", 2)
-				case strings.Contains(entry, ":"):
-					splitEntry = strings.SplitN(entry, ":", 2)
-				default:
-					continue
-				}
-
-				header := strings.TrimSpace(splitEntry[0])
-				value := splitEntry[1]
-
-				request.Headers.Set(header, value)
-			}
-		})
-	}
-
-	extensions.Referer(crawler.PageCollector)
-
-	HTTPTransport := &http.Transport{
-		DialContext: (&net.Dialer{
-			Timeout:   time.Duration(cfg.Timeout) * time.Second,
-			KeepAlive: time.Duration(cfg.Timeout) * time.Second,
-		}).DialContext,
-		MaxIdleConns:        100, // Golang default is 100
-		MaxConnsPerHost:     1000,
-		IdleConnTimeout:     time.Duration(cfg.Timeout) * time.Second,
-		TLSHandshakeTimeout: time.Duration(cfg.Timeout) * time.Second,
-		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: true,
-			Renegotiation:      tls.RenegotiateOnceAsClient,
-		},
-	}
-
-	HTTPClient := &http.Client{
-		Transport: HTTPTransport,
-	}
-
-	// NOTE: Must come BEFORE .SetClient calls
-	crawler.PageCollector.SetClient(HTTPClient)
-
-	// Proxies
-	// NOTE: Must come AFTER .SetClient calls
-	if len(crawler.cfg.Proxies) > 0 {
-		var rrps colly.ProxyFunc
-
-		rrps, err = proxy.RoundRobinProxySwitcher(crawler.cfg.Proxies...)
-		if err != nil {
-			return
-		}
-
-		crawler.PageCollector.SetProxyFunc(rrps)
-	}
-
-	if crawler.cfg.Debug {
-		crawler.PageCollector.SetDebugger(&debug.LogDebugger{})
-	}
-
-	crawler.FileCollector = crawler.PageCollector.Clone()
-	crawler.FileCollector.URLFilters = nil
-
-	crawler.PageCollector.ID = 1
-	crawler.PageCollector.SetStorage(&storage.InMemoryStorage{})
-
-	crawler.FileCollector.ID = 2
-	crawler.FileCollector.SetStorage(&storage.InMemoryStorage{})
+	crawler.pageCollectorStorage = &storage.InMemoryStorage{}
+	crawler.fileCollectorStorage = &storage.InMemoryStorage{}
 
 	return
 }

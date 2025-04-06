@@ -220,6 +220,8 @@ func main() {
 		hqgologger.Fatal().Msg(err.Error())
 	}
 
+	seenURLs := &sync.Map{}
+
 	wg := &sync.WaitGroup{}
 
 	for range concurrency {
@@ -239,6 +241,11 @@ func main() {
 								hqgologger.Error().Msgf("%s: %s", result.Source, result.Error)
 							}
 						case xcrawl3r.ResultURL:
+							_, loaded := seenURLs.LoadOrStore(result.Value, struct{}{})
+							if loaded {
+								continue
+							}
+
 							if err := writer.Write(output, result); err != nil {
 								hqgologger.Error().Msg(err.Error())
 							}
