@@ -46,6 +46,8 @@ func (crawler *Crawler) Crawl(URL string) <-chan Result {
 
 		results <- result
 
+		close(results)
+
 		return results
 	}
 
@@ -190,6 +192,7 @@ func (crawler *Crawler) Crawl(URL string) <-chan Result {
 
 		crawler.FileCollector.OnResponse(func(response *colly.Response) {
 			ext := path.Ext(response.Request.URL.Path)
+
 			body := string(response.Body)
 
 			replacer := strings.NewReplacer(
@@ -252,8 +255,6 @@ func (crawler *Crawler) Crawl(URL string) <-chan Result {
 			}
 
 			results <- result
-
-			return
 		}
 
 		if err := crawler.FileCollector.Visit(fmt.Sprintf("%s://%s/robots.txt", parsedURL.Scheme, parsedURL.Host)); err != nil {
@@ -264,8 +265,6 @@ func (crawler *Crawler) Crawl(URL string) <-chan Result {
 			}
 
 			results <- result
-
-			return
 		}
 
 		sitemapPaths := []string{
@@ -292,8 +291,6 @@ func (crawler *Crawler) Crawl(URL string) <-chan Result {
 				}
 
 				results <- result
-
-				continue
 			}
 		}
 
