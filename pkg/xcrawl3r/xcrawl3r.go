@@ -16,6 +16,7 @@ import (
 	"github.com/gocolly/colly/v2/debug"
 	"github.com/gocolly/colly/v2/extensions"
 	"github.com/gocolly/colly/v2/proxy"
+	"github.com/gocolly/colly/v2/storage"
 	"github.com/hueristiq/hq-go-url/extractor"
 	"github.com/hueristiq/hq-go-url/parser"
 )
@@ -31,37 +32,24 @@ type Crawler struct {
 	FileCollector         *colly.Collector
 }
 
-func (crawler *Crawler) Crawl(URL string) <-chan Result {
+func (crawler *Crawler) Crawl(targetURL string) <-chan Result {
 	results := make(chan Result)
-
-	seenURLs := &sync.Map{}
-
-	parsedURL, err := up.Parse(URL)
-	if err != nil {
-		result := Result{
-			Type:   ResultError,
-			Source: "page:href",
-			Error:  err,
-		}
-
-		results <- result
-
-		close(results)
-
-		return results
-	}
 
 	go func() {
 		defer close(results)
 
+		seenURLs := &sync.Map{}
+
 		crawler.PageCollector.OnRequest(func(request *colly.Request) {
-			if match := crawler.URLsNotToRequestRegex.MatchString(request.URL.String()); match {
+			ext := path.Ext(request.URL.Path)
+
+			if match := crawler.URLsNotToRequestRegex.MatchString(ext); match {
 				request.Abort()
 
 				return
 			}
 
-			if match := crawler.URLsToFilesRegex.MatchString(request.URL.String()); match {
+			if match := crawler.URLsToFilesRegex.MatchString(ext); match {
 				if err := crawler.FileCollector.Visit(request.URL.String()); err != nil {
 					result := Result{
 						Type:   ResultError,
@@ -90,6 +78,7 @@ func (crawler *Crawler) Crawl(URL string) <-chan Result {
 
 		crawler.PageCollector.OnHTML("[href]", func(e *colly.HTMLElement) {
 			relativeURL := e.Attr("href")
+
 			absoluteURL := e.Request.AbsoluteURL(relativeURL)
 
 			var valid bool
@@ -119,13 +108,12 @@ func (crawler *Crawler) Crawl(URL string) <-chan Result {
 				}
 
 				results <- result
-
-				return
 			}
 		})
 
 		crawler.PageCollector.OnHTML("[src]", func(e *colly.HTMLElement) {
 			relativeURL := e.Attr("src")
+
 			absoluteURL := e.Request.AbsoluteURL(relativeURL)
 
 			var valid bool
@@ -147,20 +135,6 @@ func (crawler *Crawler) Crawl(URL string) <-chan Result {
 
 			results <- result
 
-			if match := crawler.URLsToFilesRegex.MatchString(absoluteURL); match {
-				if err := crawler.FileCollector.Visit(absoluteURL); err != nil {
-					result := Result{
-						Type:   ResultError,
-						Source: "page:src",
-						Error:  err,
-					}
-
-					results <- result
-				}
-
-				return
-			}
-
 			if err := e.Request.Visit(absoluteURL); err != nil {
 				result := Result{
 					Type:   ResultError,
@@ -169,8 +143,6 @@ func (crawler *Crawler) Crawl(URL string) <-chan Result {
 				}
 
 				results <- result
-
-				return
 			}
 		})
 
@@ -216,7 +188,6 @@ func (crawler *Crawler) Crawl(URL string) <-chan Result {
 			URLs := crawler.URLsExtractorRegex.FindAllString(body, -1)
 
 			for _, fileURL := range URLs {
-				// ignore, if it's a mime type
 				_, _, err := mime.ParseMediaType(fileURL)
 				if err == nil {
 					continue
@@ -251,33 +222,32 @@ func (crawler *Crawler) Crawl(URL string) <-chan Result {
 					}
 
 					results <- result
-
-					continue
 				}
 			}
 		})
 
-		if err := crawler.PageCollector.Visit(parsedURL.String()); err != nil {
+		parsedTargetURL, err := up.Parse(targetURL)
+		if err != nil {
 			result := Result{
 				Type:   ResultError,
-				Source: "page",
+				Source: "page:href",
 				Error:  err,
 			}
 
 			results <- result
+
+			return
 		}
 
-		if err := crawler.FileCollector.Visit(fmt.Sprintf("%s://%s/robots.txt", parsedURL.Scheme, parsedURL.Host)); err != nil {
-			result := Result{
-				Type:   ResultError,
-				Source: "page",
-				Error:  err,
-			}
-
-			results <- result
+		targetURLs := []string{
+			parsedTargetURL.String(),
 		}
 
-		sitemapPaths := []string{
+		robotsTXTURL := fmt.Sprintf("%s://%s/robots.txt", parsedTargetURL.Scheme, parsedTargetURL.Host)
+
+		targetURLs = append(targetURLs, robotsTXTURL)
+
+		sitemaps := []string{
 			"/sitemap.xml",
 			"/sitemap_news.xml",
 			"/sitemap_index.xml",
@@ -292,8 +262,14 @@ func (crawler *Crawler) Crawl(URL string) <-chan Result {
 			"/author-sitemap.xml",
 		}
 
-		for _, path := range sitemapPaths {
-			if err := crawler.FileCollector.Visit(fmt.Sprintf("%s://%s%s", parsedURL.Scheme, parsedURL.Host, path)); err != nil {
+		for _, sitemap := range sitemaps {
+			sitemapURL := fmt.Sprintf("%s://%s%s", parsedTargetURL.Scheme, parsedTargetURL.Host, sitemap)
+
+			targetURLs = append(targetURLs, sitemapURL)
+		}
+
+		for i := range targetURLs {
+			if err := crawler.PageCollector.Visit(targetURLs[i]); err != nil {
 				result := Result{
 					Type:   ResultError,
 					Source: "page",
@@ -304,8 +280,8 @@ func (crawler *Crawler) Crawl(URL string) <-chan Result {
 			}
 		}
 
-		crawler.PageCollector.Wait()
 		crawler.FileCollector.Wait()
+		crawler.PageCollector.Wait()
 	}()
 
 	return results
@@ -378,8 +354,8 @@ func New(cfg *Configuration) (crawler *Crawler, err error) {
 	}
 
 	crawler.URLFilterRegex = regexp.MustCompile(URLFilterRegexPattern)
-	crawler.URLsNotToRequestRegex = regexp.MustCompile(`(?i)\.(apng|bpm|png|bmp|gif|heif|ico|cur|jpg|jpeg|jfif|pjp|pjpeg|psd|raw|svg|tif|tiff|webp|xbm|3gp|aac|flac|mpg|mpeg|mp3|mp4|m4a|m4v|m4p|oga|ogg|ogv|mov|wav|webm|eot|woff|woff2|ttf|otf|css)(?:\?|#|$)`)
-	crawler.URLsToFilesRegex = regexp.MustCompile(`(?i)\.(js|json|xml|csv|txt|map)(?:\?|#|$)`)
+	crawler.URLsNotToRequestRegex = regexp.MustCompile(`\.(apng|bpm|png|bmp|gif|heif|ico|cur|jpg|jpeg|jfif|pjp|pjpeg|psd|raw|svg|tif|tiff|webp|xbm|3gp|aac|flac|mpg|mpeg|mp3|mp4|m4a|m4v|m4p|oga|ogg|ogv|mov|wav|webm|eot|woff|woff2|ttf|otf)$`)
+	crawler.URLsToFilesRegex = regexp.MustCompile(`\.(css|js|json|xml|csv|txt)$`)
 
 	crawler.PageCollector = colly.NewCollector(
 		colly.Async(true),
@@ -465,7 +441,10 @@ func New(cfg *Configuration) (crawler *Crawler, err error) {
 	crawler.FileCollector.URLFilters = nil
 
 	crawler.PageCollector.ID = 1
+	crawler.PageCollector.SetStorage(&storage.InMemoryStorage{})
+
 	crawler.FileCollector.ID = 2
+	crawler.FileCollector.SetStorage(&storage.InMemoryStorage{})
 
 	return
 }
