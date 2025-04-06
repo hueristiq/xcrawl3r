@@ -3,7 +3,6 @@ package xcrawl3r
 import (
 	"crypto/tls"
 	"fmt"
-	"mime"
 	"net"
 	"net/http"
 	"path"
@@ -121,17 +120,15 @@ func (crawler *Crawler) Crawl(targetURL string) <-chan Result {
 		})
 
 		crawler.PageCollector.OnHTML("[href]", func(e *colly.HTMLElement) {
-			relativeURL := e.Attr("href")
+			link := e.Attr("href")
 
-			absoluteURL := e.Request.AbsoluteURL(relativeURL)
+			URL := e.Request.AbsoluteURL(link)
 
-			var valid bool
-
-			if absoluteURL, valid = crawler.Validate(absoluteURL); !valid {
+			if valid := crawler.Validate(URL); !valid {
 				return
 			}
 
-			_, loaded := seenURLs.LoadOrStore(absoluteURL, struct{}{})
+			_, loaded := seenURLs.LoadOrStore(URL, struct{}{})
 			if loaded {
 				return
 			}
@@ -139,12 +136,12 @@ func (crawler *Crawler) Crawl(targetURL string) <-chan Result {
 			result := Result{
 				Type:   ResultURL,
 				Source: "page:href",
-				Value:  absoluteURL,
+				Value:  URL,
 			}
 
 			results <- result
 
-			if err := e.Request.Visit(absoluteURL); err != nil {
+			if err := e.Request.Visit(URL); err != nil {
 				result := Result{
 					Type:   ResultError,
 					Source: "page:href",
@@ -156,17 +153,15 @@ func (crawler *Crawler) Crawl(targetURL string) <-chan Result {
 		})
 
 		crawler.PageCollector.OnHTML("[src]", func(e *colly.HTMLElement) {
-			relativeURL := e.Attr("src")
+			link := e.Attr("src")
 
-			absoluteURL := e.Request.AbsoluteURL(relativeURL)
+			URL := e.Request.AbsoluteURL(link)
 
-			var valid bool
-
-			if absoluteURL, valid = crawler.Validate(absoluteURL); !valid {
+			if valid := crawler.Validate(URL); !valid {
 				return
 			}
 
-			_, loaded := seenURLs.LoadOrStore(absoluteURL, struct{}{})
+			_, loaded := seenURLs.LoadOrStore(URL, struct{}{})
 			if loaded {
 				return
 			}
@@ -174,12 +169,12 @@ func (crawler *Crawler) Crawl(targetURL string) <-chan Result {
 			result := Result{
 				Type:   ResultURL,
 				Source: "page:src",
-				Value:  absoluteURL,
+				Value:  URL,
 			}
 
 			results <- result
 
-			if err := e.Request.Visit(absoluteURL); err != nil {
+			if err := e.Request.Visit(URL); err != nil {
 				result := Result{
 					Type:   ResultError,
 					Source: "page:src",
@@ -229,23 +224,16 @@ func (crawler *Crawler) Crawl(targetURL string) <-chan Result {
 
 			body = replacer.Replace(body)
 
-			URLs := crawler.URLsExtractorRegex.FindAllString(body, -1)
+			links := crawler.URLsExtractorRegex.FindAllString(body, -1)
 
-			for _, fileURL := range URLs {
-				_, _, err := mime.ParseMediaType(fileURL)
-				if err == nil {
+			for _, link := range links {
+				URL := response.Request.AbsoluteURL(link)
+
+				if valid := crawler.Validate(URL); !valid {
 					continue
 				}
 
-				fileURL = response.Request.AbsoluteURL(fileURL)
-
-				var valid bool
-
-				if fileURL, valid = crawler.Validate(fileURL); !valid {
-					continue
-				}
-
-				_, loaded := seenURLs.LoadOrStore(fileURL, struct{}{})
+				_, loaded := seenURLs.LoadOrStore(URL, struct{}{})
 				if loaded {
 					continue
 				}
@@ -253,12 +241,12 @@ func (crawler *Crawler) Crawl(targetURL string) <-chan Result {
 				result := Result{
 					Type:   ResultURL,
 					Source: "file:" + ext,
-					Value:  fileURL,
+					Value:  URL,
 				}
 
 				results <- result
 
-				if err := crawler.PageCollector.Visit(fileURL); err != nil {
+				if err := crawler.PageCollector.Visit(URL); err != nil {
 					result := Result{
 						Type:   ResultError,
 						Source: "file:" + ext,
@@ -289,20 +277,7 @@ func (crawler *Crawler) Crawl(targetURL string) <-chan Result {
 	return results
 }
 
-func (crawler *Crawler) Validate(target string) (URL string, valid bool) {
-	scheme := "https"
-
-	switch {
-	case strings.HasPrefix(target, "//"):
-		URL = scheme + ":" + target
-	case strings.HasPrefix(target, "://"):
-		URL = scheme + target
-	case !strings.Contains(target, "//"):
-		URL = scheme + "://" + target
-	default:
-		URL = target
-	}
-
+func (crawler *Crawler) Validate(URL string) (valid bool) {
 	valid = crawler.URLFilterRegex.MatchString(URL)
 
 	return
