@@ -278,8 +278,8 @@ func (crawler *Crawler) Crawl(targetURL string) <-chan Result {
 			}
 		}
 
-		crawler.PageCollector.Wait()
 		crawler.FileCollector.Wait()
+		crawler.PageCollector.Wait()
 
 		close(results)
 	}()
