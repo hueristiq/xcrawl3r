@@ -220,7 +220,6 @@ func (crawler *Crawler) Crawl(targetURL string) <-chan Result {
 			crawler.PageCollector.Visit(targetURLs[i])
 		}
 
-		crawler.FileCollector.Wait()
 		crawler.PageCollector.Wait()
 	}()
 
