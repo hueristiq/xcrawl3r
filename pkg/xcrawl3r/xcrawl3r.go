@@ -219,6 +219,7 @@ func (crawler *Crawler) Crawl(targetURL string) <-chan Result {
 			p.Visit(targetURLs[i])
 		}
 
+		f.Wait()
 		p.Wait()
 	}()
 
