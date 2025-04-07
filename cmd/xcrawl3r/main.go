@@ -43,8 +43,8 @@ var (
 
 func init() {
 	defaultDepth := 1
-	defaultConcurrency := 10
-	defaultParallelism := 10
+	defaultConcurrency := 5
+	defaultParallelism := 5
 	defaultTimeout := 10
 
 	pflag.StringSliceVarP(&URLs, "url", "u", []string{}, "")
