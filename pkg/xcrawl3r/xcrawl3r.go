@@ -41,7 +41,7 @@ func (c *Crawler) Crawl(target string) <-chan Result {
 		if err != nil {
 			result := Result{
 				Type:  ResultError,
-				Error: err,
+				Error: fmt.Errorf("error creating targets for %s: %w", target, err),
 			}
 
 			results <- result
@@ -53,7 +53,7 @@ func (c *Crawler) Crawl(target string) <-chan Result {
 		if err != nil {
 			result := Result{
 				Type:  ResultError,
-				Error: err,
+				Error: fmt.Errorf("error creating collector for %s: %w", target, err),
 			}
 
 			results <- result
@@ -81,10 +81,10 @@ func (c *Crawler) Crawl(target string) <-chan Result {
 			}
 		})
 
-		collector.OnError(func(_ *colly.Response, err error) {
+		collector.OnError(func(response *colly.Response, err error) {
 			result := Result{
 				Type:  ResultError,
-				Error: err,
+				Error: fmt.Errorf("error requesting %s: %w", response.Request.URL.String(), err),
 			}
 
 			results <- result
@@ -124,7 +124,7 @@ func (c *Crawler) Crawl(target string) <-chan Result {
 				if err := response.Request.Visit(URL); err != nil {
 					result := Result{
 						Type:  ResultError,
-						Error: err,
+						Error: fmt.Errorf("error visiting %s: %w", URL, err),
 					}
 
 					results <- result
@@ -155,7 +155,7 @@ func (c *Crawler) Crawl(target string) <-chan Result {
 			if err := e.Request.Visit(URL); err != nil {
 				result := Result{
 					Type:  ResultError,
-					Error: err,
+					Error: fmt.Errorf("error visiting %s: %w", URL, err),
 				}
 
 				results <- result
@@ -185,17 +185,19 @@ func (c *Crawler) Crawl(target string) <-chan Result {
 			if err := e.Request.Visit(URL); err != nil {
 				result := Result{
 					Type:  ResultError,
-					Error: err,
+					Error: fmt.Errorf("error visiting %s: %w", URL, err),
 				}
 
 				results <- result
 			}
 
 			if strings.Contains(URL, ".min.") {
-				if err := e.Request.Visit(strings.ReplaceAll(URL, ".min.", ".")); err != nil {
+				URL = strings.ReplaceAll(URL, ".min.", ".")
+
+				if err := e.Request.Visit(URL); err != nil {
 					result := Result{
 						Type:  ResultError,
-						Error: err,
+						Error: fmt.Errorf("error visiting %s: %w", URL, err),
 					}
 
 					results <- result
@@ -207,7 +209,7 @@ func (c *Crawler) Crawl(target string) <-chan Result {
 			if err := collector.Visit(target); err != nil {
 				result := Result{
 					Type:  ResultError,
-					Error: err,
+					Error: fmt.Errorf("error visiting %s: %w", target, err),
 				}
 
 				results <- result
@@ -341,6 +343,8 @@ func (c *Crawler) collector() (collector *colly.Collector, err error) {
 	if c.cfg.Debug {
 		collector.SetDebugger(&debug.LogDebugger{})
 	}
+
+	collector.SetStorage(c.storage)
 
 	return
 }
