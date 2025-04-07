@@ -22,7 +22,7 @@ Unlike [`xurlfind3r`](https://github.com/hueristiq/xurlfind3r/) that doesn't int
 ## Features
 
 - Recursively spiders webpages for URLs
-- Parses URLs from files (inluding sitemaps & `robots.txt`)
+- Extract URLs from files (inluding sitemaps & `robots.txt`)
 - Cross-Platform (Windows, Linux & macOS)
 
 ## Installation
@@ -163,22 +163,23 @@ CONFIGURATION:
  -c, --concurrency int             number of concurrent inputs to process (default: 10)
  -p, --parallelism int             number of concurrent fetchers to use (default: 10)
      --delay int                   delay between each request in seconds
- -H, --header string[]             custom header to include in requests
+ -H, --header string[]             header to include in 'header:value' format
 
-TIP: For multiple headers use comma(,) separated value with `--header`
-     or specify multiple `--header`.
+TIP: For multiple headers use comma(,) separated value with `-H`
+     or specify multiple `-H`.
 
      --timeout int                 time to wait for request in seconds (default: 10)
-     --proxy string[]              Proxy URL (e.g: http://127.0.0.1:8080)
+     --proxy string[]              Proxy (e.g: http://127.0.0.1:8080)
 
 TIP: For multiple proxies use comma(,) separated value with `--proxy`
      or specify multiple `--proxy`.
 
-OUTPUT:
      --debug bool                  enable debug mode
-     --jsonl bool                  output URLs in JSONL format
- -m, --monochrome bool             stdout monochrome output
+
+OUTPUT:
+     --jsonl bool                  output URLs in JSONL
  -o, --output string               output URLs file path
+ -m, --monochrome bool             stdout monochrome output
  -s, --silent bool                 stdout URLs only output
  -v, --verbose bool                stdout verbose output
 

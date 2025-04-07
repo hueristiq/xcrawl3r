@@ -4,6 +4,7 @@ go 1.24.2
 
 require (
 	github.com/gocolly/colly/v2 v2.2.0
+	github.com/hueristiq/hq-go-http v0.0.0-20250405144023-01db095bc799
 	github.com/hueristiq/hq-go-logger v0.0.0-20250405145000-8b9c281d946c
 	github.com/hueristiq/hq-go-url v0.0.0-20250405142143-8bac2f398701
 	github.com/logrusorgru/aurora/v4 v4.0.0
