@@ -15,6 +15,7 @@ Unlike [`xurlfind3r`](https://github.com/hueristiq/xurlfind3r/) that doesn't int
 		- [`go install ...`](#go-install)
 		- [`go build ...` the development version](#go-build--the-development-version)
 	- [Install on Docker (With Docker Installed)](#install-on-docker-with-docker-installed)
+- [Post Installation](#post-installation)
 - [Usage](#usage)
 - [Contributing](#contributing)
 - [Licensing](#licensing)
@@ -120,6 +121,16 @@ To install `xcrawl3r` on docker:
     ```bash
     docker run --rm hueristiq/xcrawl3r:latest -h
     ```
+
+## Post Installation
+
+`xcrawl3r` will work right after [installation](#installation). However, some configuration added to a configuration file at `$HOME/.config/xcrawl3r/config.yaml`, created upon first run, or set as environment variables.
+
+Example of environment variables:
+
+```bash
+XCRAWL3R_REQUEST_TIMEOUT=10
+```
 
 ## Usage
 
