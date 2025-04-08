@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"sync"
 
-	"github.com/hueristiq/hq-go-http/header"
 	hqgologger "github.com/hueristiq/hq-go-logger"
 	"github.com/hueristiq/hq-go-logger/formatter"
 	"github.com/hueristiq/hq-go-logger/levels"
@@ -17,47 +17,45 @@ import (
 	"github.com/hueristiq/xcrawl3r/pkg/xcrawl3r"
 	"github.com/logrusorgru/aurora/v4"
 	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
 )
 
 var (
-	URLs              []string
-	URLsListFilePath  string
-	domains           []string
-	includeSubdomains bool
-	depth             int
-	concurrency       int
-	parallelism       int
-	delay             int
-	headers           []string
-	timeout           int
-	proxies           []string
-	debug             bool
-	outputInJSONL     bool
-	outputFilePath    string
-	monochrome        bool
-	silent            bool
-	verbose           bool
+	configurationFilePath string
+	URLs                  []string
+	URLsListFilePath      string
+	domains               []string
+	includeSubdomains     bool
+	delay                 int
+	headers               []string
+	timeout               int
+	proxies               []string
+	depth                 int
+	concurrency           int
+	parallelism           int
+	debug                 bool
+	outputInJSONL         bool
+	outputFilePath        string
+	monochrome            bool
+	silent                bool
+	verbose               bool
 
 	au = aurora.New(aurora.WithColors(true))
 )
 
 func init() {
-	defaultDepth := 1
-	defaultConcurrency := 5
-	defaultParallelism := 5
-	defaultTimeout := 10
-
+	pflag.StringVarP(&configurationFilePath, "configuration", "c", configuration.DefaultConfigurationFilePath, "")
 	pflag.StringSliceVarP(&URLs, "url", "u", []string{}, "")
 	pflag.StringVarP(&URLsListFilePath, "list", "l", "", "")
 	pflag.StringSliceVarP(&domains, "domain", "d", []string{}, "")
 	pflag.BoolVar(&includeSubdomains, "include-subdomains", false, "")
-	pflag.IntVar(&depth, "depth", defaultDepth, "")
-	pflag.IntVarP(&concurrency, "concurrency", "c", defaultConcurrency, "")
-	pflag.IntVarP(&parallelism, "parallelism", "p", defaultParallelism, "")
-	pflag.IntVar(&delay, "delay", 0, "")
+	pflag.IntVar(&delay, "delay", configuration.DefaultConfiguration.Request.Delay, "")
 	pflag.StringSliceVarP(&headers, "header", "H", []string{}, "")
-	pflag.IntVar(&timeout, "timeout", defaultTimeout, "")
-	pflag.StringSliceVar(&proxies, "proxy", []string{}, "")
+	pflag.IntVar(&timeout, "timeout", configuration.DefaultConfiguration.Request.Timeout, "")
+	pflag.StringSliceVarP(&proxies, "proxy", "p", []string{}, "")
+	pflag.IntVar(&depth, "depth", configuration.DefaultConfiguration.Optimization.Depth, "")
+	pflag.IntVarP(&concurrency, "concurrency", "C", configuration.DefaultConfiguration.Optimization.Concurrency, "")
+	pflag.IntVarP(&parallelism, "parallelism", "P", configuration.DefaultConfiguration.Optimization.Parallelism, "")
 	pflag.BoolVar(&debug, "debug", false, "")
 	pflag.BoolVar(&outputInJSONL, "jsonl", false, "")
 	pflag.StringVarP(&outputFilePath, "output", "o", "", "")
@@ -70,6 +68,12 @@ func init() {
 
 		h := "USAGE:\n"
 		h += fmt.Sprintf(" %s [OPTIONS]\n", configuration.NAME)
+
+		h += "\nCONFIGURATION:\n"
+
+		defaultConfigurationFilePath := strings.ReplaceAll(configuration.DefaultConfigurationFilePath, configuration.UserDotConfigDirectoryPath, "$HOME/.config")
+
+		h += fmt.Sprintf(" -c, --configuration string       (default: %v)\n", au.Underline(defaultConfigurationFilePath).Bold())
 
 		h += "\nINPUT:\n"
 		h += " -u, --url string[]               target URL\n"
@@ -86,22 +90,27 @@ func init() {
 
 		h += "     --include-subdomains bool    with domain(s), match subdomains' URLs\n"
 
-		h += "\nCONFIGURATION:\n"
-		h += fmt.Sprintf("     --depth int                  maximum depth to crawl, `0` for infinite (default: %d)\n", defaultDepth)
-		h += fmt.Sprintf(" -c, --concurrency int            number of concurrent inputs to process (default: %d)\n", defaultConcurrency)
-		h += fmt.Sprintf(" -p, --parallelism int            number of concurrent fetchers to use (default: %d)\n", defaultParallelism)
+		h += "\nREQUEST:\n"
 		h += "     --delay int                  delay between each request in seconds\n"
 		h += " -H, --header string[]            header to include in 'header:value' format\n"
 
 		h += "\n For multiple headers, use comma(,) separated value with `--header`\n"
 		h += " or specify multiple `--header`.\n\n"
 
-		h += fmt.Sprintf("     --timeout int                time to wait for request in seconds (default: %d)\n", defaultTimeout)
-		h += "     --proxy string[]             Proxy (e.g: http://127.0.0.1:8080)\n"
+		h += fmt.Sprintf("     --timeout int                time to wait for request in seconds (default: %d)\n", configuration.DefaultConfiguration.Request.Timeout)
+
+		h += "\nPROXY:\n"
+		h += " -p, --proxy string[]             Proxy (e.g: http://127.0.0.1:8080)\n"
 
 		h += "\n For multiple proxies use comma(,) separated value with `--proxy`\n"
-		h += " or specify multiple `--proxy`.\n\n"
+		h += " or specify multiple `--proxy`.\n"
 
+		h += "\nOPTIMIZATION:\n"
+		h += fmt.Sprintf("     --depth int                  maximum depth to crawl, `0` for infinite (default: %d)\n", configuration.DefaultConfiguration.Optimization.Depth)
+		h += fmt.Sprintf(" -C, --concurrency int            number of concurrent inputs to process (default: %d)\n", configuration.DefaultConfiguration.Optimization.Concurrency)
+		h += fmt.Sprintf(" -P, --parallelism int            number of concurrent fetchers to use (default: %d)\n", configuration.DefaultConfiguration.Optimization.Parallelism)
+
+		h += "\nDEBUG:\n"
 		h += "     --debug bool                 enable debug mode\n"
 
 		h += "\nOUTPUT:\n"
@@ -116,6 +125,39 @@ func init() {
 	}
 
 	pflag.Parse()
+
+	if err := configuration.CreateOrUpdate(configurationFilePath); err != nil {
+		hqgologger.Fatal().Msg(err.Error())
+	}
+
+	viper.SetConfigFile(configurationFilePath)
+	viper.AutomaticEnv()
+	viper.SetEnvPrefix(strings.ToUpper(configuration.NAME))
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+
+	if err := viper.ReadInConfig(); err != nil {
+		hqgologger.Fatal().Msg(err.Error())
+	}
+
+	if err := viper.BindPFlag("request.delay", pflag.Lookup("delay")); err != nil {
+		hqgologger.Fatal().Msg(err.Error())
+	}
+
+	if err := viper.BindPFlag("request.timeout", pflag.Lookup("timeout")); err != nil {
+		hqgologger.Fatal().Msg(err.Error())
+	}
+
+	if err := viper.BindPFlag("optimization.depth", pflag.Lookup("depth")); err != nil {
+		hqgologger.Fatal().Msg(err.Error())
+	}
+
+	if err := viper.BindPFlag("optimization.concurrency", pflag.Lookup("concurrency")); err != nil {
+		hqgologger.Fatal().Msg(err.Error())
+	}
+
+	if err := viper.BindPFlag("optimization.parallelism", pflag.Lookup("parallelism")); err != nil {
+		hqgologger.Fatal().Msg(err.Error())
+	}
 
 	hqgologger.DefaultLogger.SetFormatter(formatter.NewConsoleFormatter(&formatter.ConsoleFormatterConfiguration{
 		Colorize: !monochrome,
@@ -135,7 +177,9 @@ func init() {
 func main() {
 	hqgologger.Info().Label("").Msg(configuration.BANNER(au))
 
-	URLsChan := make(chan string, concurrency)
+	c := viper.GetInt("optimization.concurrency")
+
+	URLsChan := make(chan string, c)
 
 	go func() {
 		defer close(URLsChan)
@@ -186,8 +230,6 @@ func main() {
 		}
 	}()
 
-	headers = append([]string{fmt.Sprintf("%s:%s", header.UserAgent, configuration.DefaultUserAgent)}, headers...)
-
 	outputs := []io.Writer{
 		os.Stdout,
 	}
@@ -214,12 +256,12 @@ func main() {
 	cfg := &xcrawl3r.Configuration{
 		Domains:           domains,
 		IncludeSubdomains: includeSubdomains,
-		Depth:             depth,
-		Parallelism:       parallelism,
-		Delay:             delay,
-		Headers:           headers,
-		Timeout:           timeout,
-		Proxies:           proxies,
+		Delay:             viper.GetInt("request.delay"),
+		Headers:           append(viper.GetStringSlice("request.headers"), headers...),
+		Timeout:           viper.GetInt("request.timeout"),
+		Proxies:           append(viper.GetStringSlice("proxies"), proxies...),
+		Depth:             viper.GetInt("optimization.depth"),
+		Parallelism:       viper.GetInt("optimization.parallelism"),
 		Debug:             debug,
 	}
 
@@ -230,7 +272,7 @@ func main() {
 
 	wg := &sync.WaitGroup{}
 
-	for range concurrency {
+	for range c {
 		wg.Add(1)
 
 		go func() {

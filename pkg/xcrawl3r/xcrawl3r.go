@@ -366,12 +366,12 @@ type ResultType int
 type Configuration struct {
 	Domains           []string
 	IncludeSubdomains bool
-	Depth             int
-	Parallelism       int
 	Delay             int
 	Headers           []string
 	Timeout           int
 	Proxies           []string
+	Depth             int
+	Parallelism       int
 	Debug             bool
 }
 
