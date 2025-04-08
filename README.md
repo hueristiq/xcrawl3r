@@ -143,6 +143,9 @@ __  _____ _ __ __ ___      _| |___ / _ __
 USAGE:
  xcrawl3r [OPTIONS]
 
+CONFIGURATION:
+ -c, --configuration string       (default: $HOME/.config/xcrawl3r/config.yaml)
+
 INPUT:
  -u, --url string[]               target URL
  -l, --list string                target URLs file path
@@ -158,10 +161,7 @@ SCOPE:
 
      --include-subdomains bool    with domain(s), match subdomains' URLs
 
-CONFIGURATION:
-     --depth int                  maximum depth to crawl, `0` for infinite (default: 1)
- -c, --concurrency int            number of concurrent inputs to process (default: 5)
- -p, --parallelism int            number of concurrent fetchers to use (default: 5)
+REQUEST:
      --delay int                  delay between each request in seconds
  -H, --header string[]            header to include in 'header:value' format
 
@@ -169,11 +169,19 @@ CONFIGURATION:
  or specify multiple `--header`.
 
      --timeout int                time to wait for request in seconds (default: 10)
-     --proxy string[]             Proxy (e.g: http://127.0.0.1:8080)
+
+PROXY:
+ -p, --proxy string[]             Proxy (e.g: http://127.0.0.1:8080)
 
  For multiple proxies use comma(,) separated value with `--proxy`
  or specify multiple `--proxy`.
 
+OPTIMIZATION:
+     --depth int                  maximum depth to crawl, `0` for infinite (default: 1)
+ -C, --concurrency int            number of concurrent inputs to process (default: 5)
+ -P, --parallelism int            number of concurrent fetchers to use (default: 5)
+
+DEBUG:
      --debug bool                 enable debug mode
 
 OUTPUT:
