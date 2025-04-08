@@ -144,44 +144,44 @@ USAGE:
  xcrawl3r [OPTIONS]
 
 INPUT:
- -u, --url string[]                target URL
- -l, --list string                 target URLs list file path
+ -u, --url string[]               target URL
+ -l, --list string                target URLs file path
 
-TIP: For multiple input URLs use comma(,) separated value with `-u`,
-     specify multiple `-u`, load from file with `-l` or load from stdin.
+ For multiple URLs, use comma(,) separated value with `--url`,
+ specify multiple `--url`, load from file with `--list` or load from stdin.
 
 SCOPE:
- -d, --domain string[]             domain to match URLs
+ -d, --domain string[]            match domain(s)  URLs
 
-TIP: For multiple domains use comma(,) separated value with `-d`
-     or specify multiple `-d`.
+ For multiple domains, use comma(,) separated value with `--domain`
+ or specify multiple `--domain`.
 
-     --include-subdomains bool     with domain(s), match subdomains' URLs
+     --include-subdomains bool    with domain(s), match subdomains' URLs
 
 CONFIGURATION:
-     --depth int                   maximum depth to crawl, `0` for infinite (default: 1)
- -c, --concurrency int             number of concurrent inputs to process (default: 10)
- -p, --parallelism int             number of concurrent fetchers to use (default: 10)
-     --delay int                   delay between each request in seconds
- -H, --header string[]             header to include in 'header:value' format
+     --depth int                  maximum depth to crawl, `0` for infinite (default: 1)
+ -c, --concurrency int            number of concurrent inputs to process (default: 5)
+ -p, --parallelism int            number of concurrent fetchers to use (default: 5)
+     --delay int                  delay between each request in seconds
+ -H, --header string[]            header to include in 'header:value' format
 
-TIP: For multiple headers use comma(,) separated value with `-H`
-     or specify multiple `-H`.
+ For multiple headers, use comma(,) separated value with `--header`
+ or specify multiple `--header`.
 
-     --timeout int                 time to wait for request in seconds (default: 10)
-     --proxy string[]              Proxy (e.g: http://127.0.0.1:8080)
+     --timeout int                time to wait for request in seconds (default: 10)
+     --proxy string[]             Proxy (e.g: http://127.0.0.1:8080)
 
-TIP: For multiple proxies use comma(,) separated value with `--proxy`
-     or specify multiple `--proxy`.
+ For multiple proxies use comma(,) separated value with `--proxy`
+ or specify multiple `--proxy`.
 
-     --debug bool                  enable debug mode
+     --debug bool                 enable debug mode
 
 OUTPUT:
-     --jsonl bool                  output URLs in JSONL
- -o, --output string               output URLs file path
- -m, --monochrome bool             stdout monochrome output
- -s, --silent bool                 stdout URLs only output
- -v, --verbose bool                stdout verbose output
+     --jsonl bool                 output in JSONL(ines)
+ -o, --output string              output write file path
+ -m, --monochrome bool            stdout in monochrome
+ -s, --silent bool                stdout in silent mode
+ -v, --verbose bool               stdout in verbose mode
 
 ```
 

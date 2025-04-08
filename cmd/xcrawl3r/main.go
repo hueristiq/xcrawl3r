@@ -72,44 +72,44 @@ func init() {
 		h += fmt.Sprintf(" %s [OPTIONS]\n", configuration.NAME)
 
 		h += "\nINPUT:\n"
-		h += " -u, --url string[]                target URL\n"
-		h += " -l, --list string                 target URLs list file path\n"
+		h += " -u, --url string[]               target URL\n"
+		h += " -l, --list string                target URLs file path\n"
 
-		h += "\nTIP: For multiple input URLs use comma(,) separated value with `-u`,\n"
-		h += "     specify multiple `-u`, load from file with `-l` or load from stdin.\n"
+		h += "\n For multiple URLs, use comma(,) separated value with `--url`,\n"
+		h += " specify multiple `--url`, load from file with `--list` or load from stdin.\n"
 
 		h += "\nSCOPE:\n"
-		h += " -d, --domain string[]             domain to match URLs\n"
+		h += " -d, --domain string[]            match domain(s)  URLs\n"
 
-		h += "\nTIP: For multiple domains use comma(,) separated value with `-d`\n"
-		h += "     or specify multiple `-d`.\n\n"
+		h += "\n For multiple domains, use comma(,) separated value with `--domain`\n"
+		h += " or specify multiple `--domain`.\n\n"
 
-		h += "     --include-subdomains bool     with domain(s), match subdomains' URLs\n"
+		h += "     --include-subdomains bool    with domain(s), match subdomains' URLs\n"
 
 		h += "\nCONFIGURATION:\n"
-		h += fmt.Sprintf("     --depth int                   maximum depth to crawl, `0` for infinite (default: %d)\n", defaultDepth)
-		h += fmt.Sprintf(" -c, --concurrency int             number of concurrent inputs to process (default: %d)\n", defaultConcurrency)
-		h += fmt.Sprintf(" -p, --parallelism int             number of concurrent fetchers to use (default: %d)\n", defaultParallelism)
-		h += "     --delay int                   delay between each request in seconds\n"
-		h += " -H, --header string[]             header to include in 'header:value' format\n"
+		h += fmt.Sprintf("     --depth int                  maximum depth to crawl, `0` for infinite (default: %d)\n", defaultDepth)
+		h += fmt.Sprintf(" -c, --concurrency int            number of concurrent inputs to process (default: %d)\n", defaultConcurrency)
+		h += fmt.Sprintf(" -p, --parallelism int            number of concurrent fetchers to use (default: %d)\n", defaultParallelism)
+		h += "     --delay int                  delay between each request in seconds\n"
+		h += " -H, --header string[]            header to include in 'header:value' format\n"
 
-		h += "\nTIP: For multiple headers use comma(,) separated value with `-H`\n"
-		h += "     or specify multiple `-H`.\n\n"
+		h += "\n For multiple headers, use comma(,) separated value with `--header`\n"
+		h += " or specify multiple `--header`.\n\n"
 
-		h += fmt.Sprintf("     --timeout int                 time to wait for request in seconds (default: %d)\n", defaultTimeout)
-		h += "     --proxy string[]              Proxy (e.g: http://127.0.0.1:8080)\n"
+		h += fmt.Sprintf("     --timeout int                time to wait for request in seconds (default: %d)\n", defaultTimeout)
+		h += "     --proxy string[]             Proxy (e.g: http://127.0.0.1:8080)\n"
 
-		h += "\nTIP: For multiple proxies use comma(,) separated value with `--proxy`\n"
-		h += "     or specify multiple `--proxy`.\n\n"
+		h += "\n For multiple proxies use comma(,) separated value with `--proxy`\n"
+		h += " or specify multiple `--proxy`.\n\n"
 
-		h += "     --debug bool                  enable debug mode\n"
+		h += "     --debug bool                 enable debug mode\n"
 
 		h += "\nOUTPUT:\n"
-		h += "     --jsonl bool                  output URLs in JSONL\n"
-		h += " -o, --output string               output URLs file path\n"
-		h += " -m, --monochrome bool             stdout monochrome output\n"
-		h += " -s, --silent bool                 stdout URLs only output\n"
-		h += " -v, --verbose bool                stdout verbose output\n"
+		h += "     --jsonl bool                 output in JSONL(ines)\n"
+		h += " -o, --output string              output write file path\n"
+		h += " -m, --monochrome bool            stdout in monochrome\n"
+		h += " -s, --silent bool                stdout in silent mode\n"
+		h += " -v, --verbose bool               stdout in verbose mode\n"
 
 		hqgologger.Info().Label("").Msg(h)
 		hqgologger.Print().Msg("")
