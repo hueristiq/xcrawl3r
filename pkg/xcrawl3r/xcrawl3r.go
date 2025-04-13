@@ -5,237 +5,294 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"path"
 	"regexp"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/gocolly/colly/v2"
 	"github.com/gocolly/colly/v2/debug"
 	"github.com/gocolly/colly/v2/extensions"
 	"github.com/gocolly/colly/v2/proxy"
-	hqgourl "github.com/hueristiq/hq-go-url"
-	"github.com/hueristiq/xcrawl3r/internal/configuration"
+	"github.com/gocolly/colly/v2/storage"
+	"github.com/hueristiq/hq-go-url/extractor"
+	"github.com/hueristiq/hq-go-url/parser"
 )
 
 type Crawler struct {
-	Domain            string
-	IncludeSubdomains bool
-	Seeds             []string
+	cfg *Configuration
 
-	Headless bool
-	Headers  []string
-	Proxies  []string
-	Render   bool
-	// Timeout   int
-	UserAgent string
+	_URLFilterRegex    *regexp.Regexp
+	_URLExtractorRegex *regexp.Regexp
 
-	// Concurrency    int
-	Delay int
-	// MaxRandomDelay int
-	Parallelism int
+	fileURLsToRequestExtRegex    *regexp.Regexp
+	fileURLsNotToRequextExtRegex *regexp.Regexp
 
-	Debug bool
-
-	FileURLsRegex *regexp.Regexp
-
-	URLsNotToRequestRegex *regexp.Regexp
-	URLsRegex             *regexp.Regexp
-
-	PageCollector *colly.Collector
-	FileCollector *colly.Collector
+	storage *storage.InMemoryStorage
 }
 
-func (crawler *Crawler) Crawl() (results chan Result) {
-	results = make(chan Result)
+func (c *Crawler) Crawl(target string) <-chan Result {
+	results := make(chan Result)
 
 	go func() {
 		defer close(results)
 
-		seedsChannel := make(chan string, crawler.Parallelism)
-
-		go func() {
-			defer close(seedsChannel)
-
-			for index := range crawler.Seeds {
-				seed := crawler.Seeds[index]
-
-				seedsChannel <- seed
+		targets, err := c.targets(target)
+		if err != nil {
+			result := Result{
+				Type:  ResultError,
+				Error: fmt.Errorf("error creating targets for %s: %w", target, err),
 			}
-		}()
 
-		URLsWG := new(sync.WaitGroup)
+			results <- result
 
-		for range crawler.Parallelism {
-			URLsWG.Add(1)
-
-			go func() {
-				defer URLsWG.Done()
-
-				for seed := range seedsChannel {
-					parsedSeed, err := up.Parse(seed)
-					if err != nil {
-						continue
-					}
-
-					seenURLs := &sync.Map{}
-
-					wg := &sync.WaitGroup{}
-
-					wg.Add(1)
-
-					go func() {
-						defer wg.Done()
-
-						for URL := range crawler.sitemapParsing(parsedSeed) {
-							_, loaded := seenURLs.LoadOrStore(URL.Value, struct{}{})
-							if loaded {
-								continue
-							}
-
-							results <- URL
-						}
-					}()
-
-					wg.Add(1)
-
-					go func() {
-						defer wg.Done()
-
-						for URL := range crawler.robotsParsing(parsedSeed) {
-							_, loaded := seenURLs.LoadOrStore(URL, struct{}{})
-							if loaded {
-								continue
-							}
-
-							results <- URL
-						}
-					}()
-
-					wg.Add(1)
-
-					go func() {
-						defer wg.Done()
-
-						for URL := range crawler.pageCrawl(parsedSeed) {
-							_, loaded := seenURLs.LoadOrStore(URL, struct{}{})
-							if loaded {
-								continue
-							}
-
-							results <- URL
-						}
-					}()
-
-					wg.Wait()
-				}
-			}()
+			return
 		}
 
-		URLsWG.Wait()
+		collector, err := c.collector()
+		if err != nil {
+			result := Result{
+				Type:  ResultError,
+				Error: fmt.Errorf("error creating collector for %s: %w", target, err),
+			}
+
+			results <- result
+
+			return
+		}
+
+		isURLToFileContextKey := "isURLToFileContextKey"
+		isURLToFileContextTrueValue := "true"
+		isURLToFileContextFalseValue := "false"
+
+		collector.OnRequest(func(request *colly.Request) {
+			ext := path.Ext(request.URL.Path)
+
+			if match := c.fileURLsNotToRequextExtRegex.MatchString(ext); match {
+				request.Abort()
+
+				return
+			}
+
+			request.Ctx.Put(isURLToFileContextKey, isURLToFileContextFalseValue)
+
+			if match := c.fileURLsToRequestExtRegex.MatchString(ext); match {
+				request.Ctx.Put(isURLToFileContextKey, isURLToFileContextTrueValue)
+			}
+		})
+
+		collector.OnError(func(response *colly.Response, err error) {
+			result := Result{
+				Type:  ResultError,
+				Error: fmt.Errorf("error requesting %s: %w", response.Request.URL.String(), err),
+			}
+
+			results <- result
+		})
+
+		collector.OnResponse(func(response *colly.Response) {
+			if response.Ctx.Get(isURLToFileContextKey) == isURLToFileContextFalseValue {
+				return
+			}
+
+			body := string(response.Body)
+
+			replacer := strings.NewReplacer(
+				"*", "",
+				`\u002f`, "/",
+				`\u0026`, "&",
+			)
+
+			body = replacer.Replace(body)
+
+			links := c._URLExtractorRegex.FindAllString(body, -1)
+
+			for _, link := range links {
+				URL := response.Request.AbsoluteURL(link)
+
+				if valid := c.validate(URL); !valid {
+					continue
+				}
+
+				result := Result{
+					Type:  ResultURL,
+					Value: URL,
+				}
+
+				results <- result
+
+				if err := response.Request.Visit(URL); err != nil {
+					result := Result{
+						Type:  ResultError,
+						Error: fmt.Errorf("error visiting %s: %w", URL, err),
+					}
+
+					results <- result
+				}
+			}
+		})
+
+		collector.OnHTML("[href]", func(e *colly.HTMLElement) {
+			if e.Request.Ctx.Get(isURLToFileContextKey) == isURLToFileContextTrueValue {
+				return
+			}
+
+			link := e.Attr("href")
+
+			URL := e.Request.AbsoluteURL(link)
+
+			if valid := c.validate(URL); !valid {
+				return
+			}
+
+			result := Result{
+				Type:  ResultURL,
+				Value: URL,
+			}
+
+			results <- result
+
+			if err := e.Request.Visit(URL); err != nil {
+				result := Result{
+					Type:  ResultError,
+					Error: fmt.Errorf("error visiting %s: %w", URL, err),
+				}
+
+				results <- result
+			}
+		})
+
+		collector.OnHTML("[src]", func(e *colly.HTMLElement) {
+			if e.Request.Ctx.Get(isURLToFileContextKey) == isURLToFileContextTrueValue {
+				return
+			}
+
+			link := e.Attr("src")
+
+			URL := e.Request.AbsoluteURL(link)
+
+			if valid := c.validate(URL); !valid {
+				return
+			}
+
+			result := Result{
+				Type:  ResultURL,
+				Value: URL,
+			}
+
+			results <- result
+
+			if err := e.Request.Visit(URL); err != nil {
+				result := Result{
+					Type:  ResultError,
+					Error: fmt.Errorf("error visiting %s: %w", URL, err),
+				}
+
+				results <- result
+			}
+
+			if strings.Contains(URL, ".min.") {
+				URL = strings.ReplaceAll(URL, ".min.", ".")
+
+				if err := e.Request.Visit(URL); err != nil {
+					result := Result{
+						Type:  ResultError,
+						Error: fmt.Errorf("error visiting %s: %w", URL, err),
+					}
+
+					results <- result
+				}
+			}
+		})
+
+		for _, target = range targets {
+			if err := collector.Visit(target); err != nil {
+				result := Result{
+					Type:  ResultError,
+					Error: fmt.Errorf("error visiting %s: %w", target, err),
+				}
+
+				results <- result
+			}
+		}
+
+		collector.Wait()
 	}()
+
+	return results
+}
+
+func (c *Crawler) targets(target string) (targets []string, err error) {
+	targets = []string{}
+
+	var parsedTargetURL *parser.URL
+
+	parsedTargetURL, err = up.Parse(target)
+	if err != nil {
+		return
+	}
+
+	targets = append(targets, parsedTargetURL.String())
+
+	if strings.Contains(parsedTargetURL.String(), ".min.") {
+		targets = append(targets, strings.ReplaceAll(parsedTargetURL.String(), ".min.", "."))
+	}
+
+	robotsTXTURL := fmt.Sprintf("%s://%s/robots.txt", parsedTargetURL.Scheme, parsedTargetURL.Host)
+
+	targets = append(targets, robotsTXTURL)
+
+	sitemaps := []string{
+		"/sitemap.xml",
+		"/sitemap_news.xml",
+		"/sitemap_index.xml",
+		"/sitemap-index.xml",
+		"/sitemapindex.xml",
+		"/sitemap-news.xml",
+		"/post-sitemap.xml",
+		"/page-sitemap.xml",
+		"/portfolio-sitemap.xml",
+		"/home_slider-sitemap.xml",
+		"/category-sitemap.xml",
+		"/author-sitemap.xml",
+	}
+
+	for _, sitemap := range sitemaps {
+		sitemapURL := fmt.Sprintf("%s://%s%s", parsedTargetURL.Scheme, parsedTargetURL.Host, sitemap)
+
+		targets = append(targets, sitemapURL)
+	}
 
 	return
 }
 
-type Configuration struct {
-	Depth int
-
-	Domain            string
-	IncludeSubdomains bool
-	Seeds             []string
-
-	Headless  bool
-	Headers   []string
-	Proxies   []string
-	Render    bool
-	Timeout   int // seconds
-	UserAgent string
-
-	Concurrency    int
-	Delay          int // seconds
-	MaxRandomDelay int // seconds
-	Parallelism    int
-
-	Debug bool
-}
-
-var (
-	DefaultUserAgent = fmt.Sprintf("%s v%s (https://github.com/hueristiq/%s)", configuration.NAME, configuration.VERSION, configuration.NAME)
-	up               = hqgourl.NewParser()
-)
-
-func New(cfg *Configuration) (crawler *Crawler, err error) {
-	crawler = &Crawler{
-		Domain:            cfg.Domain,
-		IncludeSubdomains: cfg.IncludeSubdomains,
-		Seeds:             cfg.Seeds,
-
-		Headless: cfg.Headless,
-		Headers:  cfg.Headers,
-		Proxies:  cfg.Proxies,
-		Render:   cfg.Render,
-		// Timeout:   cfg.Timeout,
-		UserAgent: cfg.UserAgent,
-
-		// Concurrency:    cfg.Concurrency,
-		Delay: cfg.Delay,
-		// MaxRandomDelay: cfg.MaxRandomDelay,
-		Parallelism: cfg.Parallelism,
-
-		Debug: cfg.Debug,
-	}
-
-	crawler.URLsRegex = hqgourl.NewExtractor().CompileRegex()
-
-	crawler.FileURLsRegex = regexp.MustCompile(`(?m).*?\.*(js|json|xml|csv|txt|map)(\?.*?|)$`)
-
-	crawler.URLsNotToRequestRegex = regexp.MustCompile(`(?i)\.(apng|bpm|png|bmp|gif|heif|ico|cur|jpg|jpeg|jfif|pjp|pjpeg|psd|raw|svg|tif|tiff|webp|xbm|3gp|aac|flac|mpg|mpeg|mp3|mp4|m4a|m4v|m4p|oga|ogg|ogv|mov|wav|webm|eot|woff|woff2|ttf|otf|css)(?:\?|#|$)`)
-
-	crawler.PageCollector = colly.NewCollector(
+func (c *Crawler) collector() (collector *colly.Collector, err error) {
+	collector = colly.NewCollector(
 		colly.Async(true),
 		colly.IgnoreRobotsTxt(),
-		colly.MaxDepth(cfg.Depth),
-		colly.AllowedDomains(crawler.Domain, "www."+crawler.Domain),
+		colly.URLFilters(c._URLFilterRegex),
+		colly.MaxDepth(c.cfg.Depth),
 	)
 
-	if crawler.IncludeSubdomains {
-		crawler.PageCollector.AllowedDomains = []string{}
-
-		// pattern := fmt.Sprintf(`https?://([a-z0-9.-]*\.)?%s(/[a-zA-Z0-9()/*\-+_~:,.?#=]*)?`, regexp.QuoteMeta(crawler.Domain))
-
-		crawler.PageCollector.URLFilters = []*regexp.Regexp{
-			// regexp.MustCompile(pattern),
-			hqgourl.NewExtractor(hqgourl.ExtractorWithSchemePattern(`(?:https?)://`)).CompileRegex(),
-		}
-	}
-
-	crawler.PageCollector.SetRequestTimeout(time.Duration(cfg.Timeout) * time.Second)
-
-	if err = crawler.PageCollector.Limit(&colly.LimitRule{
+	if err = collector.Limit(&colly.LimitRule{
 		DomainGlob:  "*",
-		Parallelism: cfg.Concurrency,
-		RandomDelay: time.Duration(cfg.MaxRandomDelay) * time.Second,
+		Parallelism: c.cfg.Parallelism,
+		RandomDelay: time.Duration(c.cfg.Delay) * time.Second,
 	}); err != nil {
 		return
 	}
 
-	if crawler.Debug {
-		crawler.PageCollector.SetDebugger(&debug.LogDebugger{})
-	}
-
-	if crawler.Headers != nil && len(crawler.Headers) > 0 {
-		crawler.PageCollector.OnRequest(func(request *colly.Request) {
-			for index := range crawler.Headers {
-				entry := crawler.Headers[index]
-
+	if len(c.cfg.Headers) > 0 {
+		collector.OnRequest(func(request *colly.Request) {
+			for _, entry := range c.cfg.Headers {
 				var splitEntry []string
 
-				if strings.Contains(entry, ": ") {
+				switch {
+				case strings.Contains(entry, ": "):
 					splitEntry = strings.SplitN(entry, ": ", 2)
-				} else if strings.Contains(entry, ":") {
+				case strings.Contains(entry, ":"):
 					splitEntry = strings.SplitN(entry, ":", 2)
-				} else {
+				default:
 					continue
 				}
 
@@ -247,30 +304,17 @@ func New(cfg *Configuration) (crawler *Crawler, err error) {
 		})
 	}
 
-	extensions.Referer(crawler.PageCollector)
-
-	if crawler.UserAgent == "" {
-		crawler.PageCollector.UserAgent = DefaultUserAgent
-	} else {
-		switch ua := strings.ToLower(crawler.UserAgent); {
-		case strings.HasPrefix(ua, "mob"):
-			extensions.RandomMobileUserAgent(crawler.PageCollector)
-		case strings.HasPrefix(ua, "web"):
-			extensions.RandomUserAgent(crawler.PageCollector)
-		default:
-			crawler.PageCollector.UserAgent = crawler.UserAgent
-		}
-	}
+	extensions.Referer(collector)
 
 	HTTPTransport := &http.Transport{
 		DialContext: (&net.Dialer{
-			Timeout:   time.Duration(cfg.Timeout) * time.Second,
-			KeepAlive: time.Duration(cfg.Timeout) * time.Second,
+			Timeout:   time.Duration(c.cfg.Timeout) * time.Second,
+			KeepAlive: time.Duration(c.cfg.Timeout) * time.Second,
 		}).DialContext,
-		MaxIdleConns:        100, // Golang default is 100
+		MaxIdleConns:        100,
 		MaxConnsPerHost:     1000,
-		IdleConnTimeout:     time.Duration(cfg.Timeout) * time.Second,
-		TLSHandshakeTimeout: time.Duration(cfg.Timeout) * time.Second,
+		IdleConnTimeout:     time.Duration(c.cfg.Timeout) * time.Second,
+		TLSHandshakeTimeout: time.Duration(c.cfg.Timeout) * time.Second,
 		TLSClientConfig: &tls.Config{
 			InsecureSkipVerify: true,
 			Renegotiation:      tls.RenegotiateOnceAsClient,
@@ -279,55 +323,103 @@ func New(cfg *Configuration) (crawler *Crawler, err error) {
 
 	HTTPClient := &http.Client{
 		Transport: HTTPTransport,
-		CheckRedirect: func(req *http.Request, via []*http.Request) (err error) {
-			nextLocation := req.Response.Header.Get("Location")
-
-			var parsedLocation *hqgourl.URL
-
-			parsedLocation, err = up.Parse(nextLocation)
-			if err != nil {
-				return
-			}
-
-			if parsedLocation.Domain == nil {
-				return
-			}
-
-			fmt.Println(parsedLocation)
-
-			if cfg.IncludeSubdomains && (parsedLocation.Domain.String() == cfg.Domain || strings.HasSuffix(parsedLocation.Domain.String(), "."+cfg.Domain)) {
-				return
-			}
-
-			if parsedLocation.Domain.String() == cfg.Domain || parsedLocation.Domain.String() == "www."+cfg.Domain {
-				return
-			}
-
-			return http.ErrUseLastResponse
-		},
 	}
 
 	// NOTE: Must come BEFORE .SetClient calls
-	crawler.PageCollector.SetClient(HTTPClient)
+	collector.SetClient(HTTPClient)
 
-	// Proxies
 	// NOTE: Must come AFTER .SetClient calls
-	if len(crawler.Proxies) > 0 {
+	if len(c.cfg.Proxies) > 0 {
 		var rrps colly.ProxyFunc
 
-		rrps, err = proxy.RoundRobinProxySwitcher(crawler.Proxies...)
+		rrps, err = proxy.RoundRobinProxySwitcher(c.cfg.Proxies...)
 		if err != nil {
 			return
 		}
 
-		crawler.PageCollector.SetProxyFunc(rrps)
+		collector.SetProxyFunc(rrps)
 	}
 
-	crawler.FileCollector = crawler.PageCollector.Clone()
-	crawler.FileCollector.URLFilters = nil
+	if c.cfg.Debug {
+		collector.SetDebugger(&debug.LogDebugger{})
+	}
 
-	crawler.PageCollector.ID = 1
-	crawler.FileCollector.ID = 2
+	collector.SetStorage(c.storage)
+
+	return
+}
+
+func (c *Crawler) validate(URL string) (valid bool) {
+	valid = c._URLFilterRegex.MatchString(URL)
+
+	return
+}
+
+type Result struct {
+	Type  ResultType
+	Value string
+	Error error
+}
+
+type ResultType int
+
+type Configuration struct {
+	Domains           []string
+	IncludeSubdomains bool
+	Delay             int
+	Headers           []string
+	Timeout           int
+	Proxies           []string
+	Depth             int
+	Parallelism       int
+	Debug             bool
+}
+
+var (
+	up = parser.New(parser.WithDefaultScheme("https"))
+)
+
+const (
+	ResultURL ResultType = iota
+	ResultError
+)
+
+func New(cfg *Configuration) (crawler *Crawler, err error) {
+	crawler = &Crawler{
+		cfg: cfg,
+	}
+
+	URLFilterRegexPattern := `https?://([a-z0-9-]+\.)(?:[a-z0-9-]+\.)+[a-z]{2,}(:\d+)?(?:/[^?\s#]*)?(?:\?[^#\s]*)?(?:#[^\s]*)?`
+
+	if cfg.Domains != nil {
+		var b strings.Builder
+
+		b.WriteString("(?:")
+
+		for i, s := range cfg.Domains {
+			if i != 0 {
+				b.WriteByte('|')
+			}
+
+			b.WriteString(regexp.QuoteMeta(s))
+		}
+
+		b.WriteByte(')')
+
+		URLFilterRegexPattern = fmt.Sprintf(`https?://(www\.)?%s(:\d+)?(?:/[^?\s#]*)?(?:\?[^#\s]*)?(?:#[^\s]*)?`, b.String())
+
+		if cfg.IncludeSubdomains {
+			URLFilterRegexPattern = fmt.Sprintf(`https?://([a-z0-9-]+\.)*%s(:\d+)?(?:/[^?\s#]*)?(?:\?[^#\s]*)?(?:#[^\s]*)?`, b.String())
+		}
+	}
+
+	crawler._URLFilterRegex = regexp.MustCompile(URLFilterRegexPattern)
+	crawler._URLExtractorRegex = extractor.New().CompileRegex()
+
+	crawler.fileURLsToRequestExtRegex = regexp.MustCompile(`\.(css|js|json|xml|csv|txt)$`)
+	crawler.fileURLsNotToRequextExtRegex = regexp.MustCompile(`\.(apng|bpm|png|bmp|gif|heif|ico|cur|jpg|jpeg|jfif|pjp|pjpeg|psd|raw|svg|tif|tiff|webp|xbm|3gp|aac|flac|mpg|mpeg|mp3|mp4|m4a|m4v|m4p|oga|ogg|ogv|mov|wav|webm|eot|woff|woff2|ttf|otf)$`)
+
+	crawler.storage = &storage.InMemoryStorage{}
 
 	return
 }

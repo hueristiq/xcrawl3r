@@ -3,280 +3,307 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"io/fs"
+	"io"
 	"os"
-	"path/filepath"
 	"strings"
+	"sync"
 
-	hqgourl "github.com/hueristiq/hq-go-url"
-	"github.com/hueristiq/hqgolog"
-	"github.com/hueristiq/hqgolog/formatter"
-	"github.com/hueristiq/hqgolog/levels"
+	hqgologger "github.com/hueristiq/hq-go-logger"
+	"github.com/hueristiq/hq-go-logger/formatter"
+	"github.com/hueristiq/hq-go-logger/levels"
 	"github.com/hueristiq/xcrawl3r/internal/configuration"
+	"github.com/hueristiq/xcrawl3r/internal/input"
+	"github.com/hueristiq/xcrawl3r/internal/output"
 	"github.com/hueristiq/xcrawl3r/pkg/xcrawl3r"
-	"github.com/logrusorgru/aurora/v3"
+	"github.com/logrusorgru/aurora/v4"
 	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
 )
 
 var (
-	au aurora.Aurora
+	configurationFilePath string
+	URLs                  []string
+	URLsListFilePath      string
+	domains               []string
+	includeSubdomains     bool
+	delay                 int
+	headers               []string
+	timeout               int
+	proxies               []string
+	depth                 int
+	concurrency           int
+	parallelism           int
+	debug                 bool
+	outputInJSONL         bool
+	outputFilePath        string
+	monochrome            bool
+	silent                bool
+	verbose               bool
 
-	domain            string
-	includeSubdomains bool
-	seedsFile         string
-	URL               string
-
-	depth     int
-	headless  bool
-	headers   []string
-	proxies   []string
-	render    bool
-	timeout   int
-	userAgent string
-
-	concurrency    int
-	delay          int
-	maxRandomDelay int
-	parallelism    int
-
-	debug      bool
-	monochrome bool
-	output     string
-
-	silent  bool
-	verbose bool
+	au = aurora.New(aurora.WithColors(true))
 )
 
 func init() {
-	// Handle command line arguments & flags
-	pflag.StringVarP(&domain, "domain", "d", "", "")
+	pflag.StringVarP(&configurationFilePath, "configuration", "c", configuration.DefaultConfigurationFilePath, "")
+	pflag.StringSliceVarP(&URLs, "url", "u", []string{}, "")
+	pflag.StringVarP(&URLsListFilePath, "list", "l", "", "")
+	pflag.StringSliceVarP(&domains, "domain", "d", []string{}, "")
 	pflag.BoolVar(&includeSubdomains, "include-subdomains", false, "")
-	pflag.StringVarP(&seedsFile, "seeds", "s", "", "")
-	pflag.StringVarP(&URL, "url", "u", "", "")
-
-	pflag.IntVar(&depth, "depth", 3, "")
-	pflag.BoolVar(&headless, "headless", false, "")
-	pflag.StringSliceVarP(&headers, "headers", "H", []string{}, "")
-	pflag.StringSliceVar(&proxies, "proxy", []string{}, "")
-	pflag.BoolVar(&render, "render", false, "")
-	pflag.IntVar(&timeout, "timeout", 10, "")
-	pflag.StringVar(&userAgent, "user-agent", xcrawl3r.DefaultUserAgent, "")
-
-	pflag.IntVarP(&concurrency, "concurrency", "c", 10, "")
-	pflag.IntVar(&delay, "delay", 0, "")
-	pflag.IntVar(&maxRandomDelay, "max-random-delay", 1, "")
-	pflag.IntVarP(&parallelism, "parallelism", "p", 10, "")
-
+	pflag.IntVar(&delay, "delay", configuration.DefaultConfiguration.Request.Delay, "")
+	pflag.StringSliceVarP(&headers, "header", "H", []string{}, "")
+	pflag.IntVar(&timeout, "timeout", configuration.DefaultConfiguration.Request.Timeout, "")
+	pflag.StringSliceVarP(&proxies, "proxy", "p", []string{}, "")
+	pflag.IntVar(&depth, "depth", configuration.DefaultConfiguration.Optimization.Depth, "")
+	pflag.IntVarP(&concurrency, "concurrency", "C", configuration.DefaultConfiguration.Optimization.Concurrency, "")
+	pflag.IntVarP(&parallelism, "parallelism", "P", configuration.DefaultConfiguration.Optimization.Parallelism, "")
 	pflag.BoolVar(&debug, "debug", false, "")
+	pflag.BoolVar(&outputInJSONL, "jsonl", false, "")
+	pflag.StringVarP(&outputFilePath, "output", "o", "", "")
 	pflag.BoolVarP(&monochrome, "monochrome", "m", false, "")
-	pflag.StringVarP(&output, "output", "o", "", "")
-
 	pflag.BoolVar(&silent, "silent", false, "")
 	pflag.BoolVarP(&verbose, "verbose", "v", false, "")
 
-	pflag.CommandLine.SortFlags = false
 	pflag.Usage = func() {
-		fmt.Fprintln(os.Stderr, configuration.BANNER)
+		hqgologger.Info().Label("").Msg(configuration.BANNER(au))
 
-		h := "\nUSAGE:\n"
-		h += "  xcrawl3r [OPTIONS]\n"
-
-		h += "\nINPUT:\n"
-		h += " -d, --domain string               domain to match URLs\n"
-		h += "     --include-subdomains bool     match subdomains' URLs\n"
-		h += " -s, --seeds string                seed URLs file (use `-` to get from stdin)\n"
-		h += " -u, --url string                  URL to crawl\n"
+		h := "USAGE:\n"
+		h += fmt.Sprintf(" %s [OPTIONS]\n", configuration.NAME)
 
 		h += "\nCONFIGURATION:\n"
-		h += "     --depth int                   maximum depth to crawl (default 3)\n"
-		h += "                                      TIP: set it to `0` for infinite recursion\n"
-		h += "     --headless bool               If true the browser will be displayed while crawling.\n"
-		h += " -H, --headers string[]            custom header to include in requests\n"
-		h += "                                      e.g. -H 'Referer: http://example.com/'\n"
-		h += "                                      TIP: use multiple flag to set multiple headers\n"
-		h += "     --proxy string[]              Proxy URL (e.g: http://127.0.0.1:8080)\n"
-		h += "                                      TIP: use multiple flag to set multiple proxies\n"
-		h += "     --render bool                 utilize a headless chrome instance to render pages\n"
-		h += "     --timeout int                 time to wait for request in seconds (default: 10)\n"
-		h += fmt.Sprintf("     --user-agent string           User Agent to use (default: %s)\n", xcrawl3r.DefaultUserAgent)
-		h += "                                      TIP: use `web` for a random web user-agent,\n"
-		h += "                                      `mobile` for a random mobile user-agent,\n"
-		h += "                                       or you can set your specific user-agent.\n"
 
-		h += "\nRATE LIMIT:\n"
-		h += " -c, --concurrency int             number of concurrent fetchers to use (default 10)\n"
-		h += "     --delay int                   delay between each request in seconds\n"
-		h += "     --max-random-delay int        maximux extra randomized delay added to `--dalay` (default: 1s)\n"
-		h += " -p, --parallelism int             number of concurrent URLs to process (default: 10)\n"
+		defaultConfigurationFilePath := strings.ReplaceAll(configuration.DefaultConfigurationFilePath, configuration.UserDotConfigDirectoryPath, "$HOME/.config")
+
+		h += fmt.Sprintf(" -c, --configuration string       (default: %v)\n", au.Underline(defaultConfigurationFilePath).Bold())
+
+		h += "\nINPUT:\n"
+		h += " -u, --url string[]               target URL\n"
+		h += " -l, --list string                target URLs file path\n"
+
+		h += "\n For multiple URLs, use comma(,) separated value with `--url`,\n"
+		h += " specify multiple `--url`, load from file with `--list` or load from stdin.\n"
+
+		h += "\nSCOPE:\n"
+		h += " -d, --domain string[]            match domain(s)  URLs\n"
+
+		h += "\n For multiple domains, use comma(,) separated value with `--domain`\n"
+		h += " or specify multiple `--domain`.\n\n"
+
+		h += "     --include-subdomains bool    with domain(s), match subdomains' URLs\n"
+
+		h += "\nREQUEST:\n"
+		h += "     --delay int                  delay between each request in seconds\n"
+		h += " -H, --header string[]            header to include in 'header:value' format\n"
+
+		h += "\n For multiple headers, use comma(,) separated value with `--header`\n"
+		h += " or specify multiple `--header`.\n\n"
+
+		h += fmt.Sprintf("     --timeout int                time to wait for request in seconds (default: %d)\n", configuration.DefaultConfiguration.Request.Timeout)
+
+		h += "\nPROXY:\n"
+		h += " -p, --proxy string[]             Proxy (e.g: http://127.0.0.1:8080)\n"
+
+		h += "\n For multiple proxies use comma(,) separated value with `--proxy`\n"
+		h += " or specify multiple `--proxy`.\n"
+
+		h += "\nOPTIMIZATION:\n"
+		h += fmt.Sprintf("     --depth int                  maximum depth to crawl, `0` for infinite (default: %d)\n", configuration.DefaultConfiguration.Optimization.Depth)
+		h += fmt.Sprintf(" -C, --concurrency int            number of concurrent inputs to process (default: %d)\n", configuration.DefaultConfiguration.Optimization.Concurrency)
+		h += fmt.Sprintf(" -P, --parallelism int            number of concurrent fetchers to use (default: %d)\n", configuration.DefaultConfiguration.Optimization.Parallelism)
+
+		h += "\nDEBUG:\n"
+		h += "     --debug bool                 enable debug mode\n"
 
 		h += "\nOUTPUT:\n"
-		h += "     --debug bool                  enable debug mode (default: false)\n"
-		h += " -m, --monochrome bool             coloring: no colored output mode\n"
-		h += " -o, --output string               output file to write found URLs\n"
-		h += "     --silent bool                 display output URLs only\n"
-		h += " -v, --verbose bool                display verbose output\n"
+		h += "     --jsonl bool                 output in JSONL(ines)\n"
+		h += " -o, --output string              output write file path\n"
+		h += " -m, --monochrome bool            stdout in monochrome\n"
+		h += " -s, --silent bool                stdout in silent mode\n"
+		h += " -v, --verbose bool               stdout in verbose mode\n"
 
-		fmt.Fprint(os.Stderr, h)
+		hqgologger.Info().Label("").Msg(h)
+		hqgologger.Print().Msg("")
 	}
 
 	pflag.Parse()
 
-	// Initialize logger
-	hqgolog.DefaultLogger.SetMaxLevel(levels.LevelInfo)
-
-	if verbose {
-		hqgolog.DefaultLogger.SetMaxLevel(levels.LevelDebug)
+	if err := configuration.CreateOrUpdate(configurationFilePath); err != nil {
+		hqgologger.Fatal().Msg(err.Error())
 	}
 
-	hqgolog.DefaultLogger.SetFormatter(formatter.NewCLI(&formatter.CLIOptions{
+	viper.SetConfigFile(configurationFilePath)
+	viper.AutomaticEnv()
+	viper.SetEnvPrefix(strings.ToUpper(configuration.NAME))
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+
+	if err := viper.ReadInConfig(); err != nil {
+		hqgologger.Fatal().Msg(err.Error())
+	}
+
+	if err := viper.BindPFlag("request.delay", pflag.Lookup("delay")); err != nil {
+		hqgologger.Fatal().Msg(err.Error())
+	}
+
+	if err := viper.BindPFlag("request.timeout", pflag.Lookup("timeout")); err != nil {
+		hqgologger.Fatal().Msg(err.Error())
+	}
+
+	if err := viper.BindPFlag("optimization.depth", pflag.Lookup("depth")); err != nil {
+		hqgologger.Fatal().Msg(err.Error())
+	}
+
+	if err := viper.BindPFlag("optimization.concurrency", pflag.Lookup("concurrency")); err != nil {
+		hqgologger.Fatal().Msg(err.Error())
+	}
+
+	if err := viper.BindPFlag("optimization.parallelism", pflag.Lookup("parallelism")); err != nil {
+		hqgologger.Fatal().Msg(err.Error())
+	}
+
+	hqgologger.DefaultLogger.SetFormatter(formatter.NewConsoleFormatter(&formatter.ConsoleFormatterConfiguration{
 		Colorize: !monochrome,
 	}))
 
-	au = aurora.NewAurora(!monochrome)
+	if silent {
+		hqgologger.DefaultLogger.SetMaxLogLevel(levels.LevelSilent)
+	}
+
+	if verbose {
+		hqgologger.DefaultLogger.SetMaxLogLevel(levels.LevelDebug)
+	}
+
+	au = aurora.New(aurora.WithColors(!monochrome))
 }
 
 func main() {
-	if !silent {
-		fmt.Fprintln(os.Stderr, configuration.BANNER)
+	hqgologger.Info().Label("").Msg(configuration.BANNER(au))
+
+	c := viper.GetInt("optimization.concurrency")
+
+	URLsChan := make(chan string, c)
+
+	go func() {
+		defer close(URLsChan)
+
+		if len(URLs) > 0 {
+			for _, URL := range URLs {
+				URLsChan <- URL
+			}
+		}
+
+		if URLsListFilePath != "" {
+			file, err := os.Open(URLsListFilePath)
+			if err != nil {
+				hqgologger.Error().Msg(err.Error())
+			}
+
+			scanner := bufio.NewScanner(file)
+
+			for scanner.Scan() {
+				URL := scanner.Text()
+
+				if URL != "" {
+					URLsChan <- URL
+				}
+			}
+
+			if err := scanner.Err(); err != nil {
+				hqgologger.Error().Msg(err.Error())
+			}
+
+			file.Close()
+		}
+
+		if input.HasStdin() {
+			scanner := bufio.NewScanner(os.Stdin)
+
+			for scanner.Scan() {
+				URL := scanner.Text()
+
+				if URL != "" {
+					URLsChan <- URL
+				}
+			}
+
+			if err := scanner.Err(); err != nil {
+				hqgologger.Error().Msg(err.Error())
+			}
+		}
+	}()
+
+	outputs := []io.Writer{
+		os.Stdout,
 	}
 
-	hqgolog.Print().Msg("")
+	writer := output.NewWriter()
 
-	if seedsFile != "" && URL == "" && domain == "" {
-		hqgolog.Fatal().Msg("using `-s, --seeds` requires either `-d, --domain` or `-u, --url` to be set!")
+	if outputInJSONL {
+		writer.SetFormatToJSONL()
 	}
 
-	up := hqgourl.NewParser()
+	var file *os.File
 
-	// Load input URLs
-	seeds := []string{}
+	if outputFilePath != "" {
+		var err error
 
-	if URL != "" {
-		seeds = append(seeds, URL)
-
-		if domain == "" {
-			parsed, err := up.Parse(URL)
-			if err != nil {
-				hqgolog.Fatal().Msg(err.Error())
-			}
-
-			domain = parsed.Domain.String()
-			domain = strings.TrimPrefix(domain, "www.")
-		}
-	}
-
-	if seedsFile != "" {
-		var (
-			err  error
-			file *os.File
-			stat fs.FileInfo
-		)
-
-		switch {
-		case seedsFile != "" && seedsFile == "-":
-			stat, err = os.Stdin.Stat()
-			if err != nil {
-				hqgolog.Fatal().Msg("no stdin")
-			}
-
-			if stat.Mode()&os.ModeNamedPipe == 0 {
-				hqgolog.Fatal().Msg("no stdin")
-			}
-
-			file = os.Stdin
-		case seedsFile != "" && seedsFile != "-":
-			file, err = os.Open(seedsFile)
-			if err != nil {
-				hqgolog.Fatal().Msg(err.Error())
-			}
-		default:
-			hqgolog.Fatal().Msg("xcrawl3r takes input from stdin or file using a flag")
+		file, err = writer.CreateFile(outputFilePath)
+		if err != nil {
+			hqgologger.Error().Msg(err.Error())
 		}
 
-		scanner := bufio.NewScanner(file)
-
-		for scanner.Scan() {
-			inputURL := scanner.Text()
-
-			if inputURL != "" {
-				seeds = append(seeds, inputURL)
-			}
-		}
-
-		if scanner.Err() != nil {
-			hqgolog.Fatal().Msgf("%s", err)
-		}
+		outputs = append(outputs, file)
 	}
 
 	cfg := &xcrawl3r.Configuration{
-		Domain:            domain,
+		Domains:           domains,
 		IncludeSubdomains: includeSubdomains,
-		Seeds:             seeds,
-
-		Depth:     depth,
-		Headless:  headless,
-		Headers:   headers,
-		Proxies:   proxies,
-		Render:    render,
-		Timeout:   timeout,
-		UserAgent: userAgent,
-
-		Concurrency:    concurrency,
-		Delay:          delay,
-		MaxRandomDelay: maxRandomDelay,
-		Parallelism:    parallelism,
-
-		Debug: debug,
+		Delay:             viper.GetInt("request.delay"),
+		Headers:           append(viper.GetStringSlice("request.headers"), headers...),
+		Timeout:           viper.GetInt("request.timeout"),
+		Proxies:           append(viper.GetStringSlice("proxies"), proxies...),
+		Depth:             viper.GetInt("optimization.depth"),
+		Parallelism:       viper.GetInt("optimization.parallelism"),
+		Debug:             debug,
 	}
 
 	crawler, err := xcrawl3r.New(cfg)
 	if err != nil {
-		hqgolog.Fatal().Msg(err.Error())
+		hqgologger.Fatal().Msg(err.Error())
 	}
 
-	var writer *bufio.Writer
+	wg := &sync.WaitGroup{}
 
-	if output != "" {
-		directory := filepath.Dir(output)
+	for range c {
+		wg.Add(1)
 
-		if _, err := os.Stat(directory); os.IsNotExist(err) {
-			if err = os.MkdirAll(directory, os.ModePerm); err != nil {
-				hqgolog.Fatal().Msg(err.Error())
-			}
-		}
+		go func() {
+			defer wg.Done()
 
-		var file *os.File
+			for URL := range URLsChan {
+				results := crawler.Crawl(URL)
 
-		file, err = os.OpenFile(output, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
-		if err != nil {
-			hqgolog.Fatal().Msg(err.Error())
-		}
-
-		defer file.Close()
-
-		writer = bufio.NewWriter(file)
-	}
-
-	for URL := range crawler.Crawl() {
-		switch URL.Type {
-		case xcrawl3r.ResultError:
-			if verbose {
-				hqgolog.Error().Msgf("%s: %s\n", URL.Source, URL.Error)
-			}
-		case xcrawl3r.ResultURL:
-			if verbose {
-				hqgolog.Print().Msgf("[%s] %s", au.BrightBlue(URL.Source), URL.Value)
-			} else {
-				hqgolog.Print().Msg(URL.Value)
-			}
-
-			if writer != nil {
-				fmt.Fprintln(writer, URL.Value)
-
-				if err := writer.Flush(); err != nil {
-					hqgolog.Fatal().Msg(err.Error())
+				for result := range results {
+					for _, output := range outputs {
+						switch result.Type {
+						case xcrawl3r.ResultError:
+							if verbose {
+								hqgologger.Error().Msg(result.Error.Error())
+							}
+						case xcrawl3r.ResultURL:
+							if err := writer.Write(output, result); err != nil {
+								hqgologger.Error().Msg(err.Error())
+							}
+						}
+					}
 				}
 			}
-		}
+		}()
 	}
+
+	wg.Wait()
+
+	if file != nil {
+		file.Close()
+	}
+
+	hqgologger.Print().Msg("")
 }
