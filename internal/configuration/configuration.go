@@ -61,7 +61,7 @@ func (cfg *Configuration) Write(path string) (err error) {
 
 const (
 	NAME    = "xcrawl3r"
-	VERSION = "0.2.0"
+	VERSION = "1.0.0"
 )
 
 var (
