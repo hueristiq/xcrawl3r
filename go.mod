@@ -3,7 +3,7 @@ module github.com/hueristiq/xcrawl3r
 go 1.24.2
 
 require (
-	dario.cat/mergo v1.0.1
+	dario.cat/mergo v1.0.2
 	github.com/gocolly/colly/v2 v2.2.0
 	github.com/hueristiq/hq-go-http v0.0.0-20250413154014-29f12bd81775
 	github.com/hueristiq/hq-go-logger v0.0.0-20250405145000-8b9c281d946c
