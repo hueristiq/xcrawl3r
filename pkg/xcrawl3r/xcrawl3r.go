@@ -15,8 +15,8 @@ import (
 	"github.com/gocolly/colly/v2/extensions"
 	"github.com/gocolly/colly/v2/proxy"
 	"github.com/gocolly/colly/v2/storage"
-	"github.com/hueristiq/hq-go-url/extractor"
-	"github.com/hueristiq/hq-go-url/parser"
+	hqgourlextractor "github.com/hueristiq/hq-go-url/extractor"
+	hqgourlparser "github.com/hueristiq/hq-go-url/parser"
 )
 
 type Crawler struct {
@@ -225,7 +225,7 @@ func (c *Crawler) Crawl(target string) <-chan Result {
 func (c *Crawler) targets(target string) (targets []string, err error) {
 	targets = []string{}
 
-	var parsedTargetURL *parser.URL
+	var parsedTargetURL *hqgourlparser.URL
 
 	parsedTargetURL, err = up.Parse(target)
 	if err != nil {
@@ -376,7 +376,7 @@ type Configuration struct {
 }
 
 var (
-	up = parser.New(parser.WithDefaultScheme("https"))
+	up = hqgourlparser.New(hqgourlparser.WithDefaultScheme("https"))
 )
 
 const (
@@ -414,7 +414,7 @@ func New(cfg *Configuration) (crawler *Crawler, err error) {
 	}
 
 	crawler._URLFilterRegex = regexp.MustCompile(URLFilterRegexPattern)
-	crawler._URLExtractorRegex = extractor.New().CompileRegex()
+	crawler._URLExtractorRegex = hqgourlextractor.New().CompileRegex()
 
 	crawler.fileURLsToRequestExtRegex = regexp.MustCompile(`\.(css|csv|js|json|map|txt|xml|yaml|yml)$`)
 	crawler.fileURLsNotToRequextExtRegex = regexp.MustCompile(`\.(apng|bpm|png|bmp|gif|heif|ico|cur|jpg|jpeg|jfif|pjp|pjpeg|psd|raw|svg|tif|tiff|webp|xbm|3gp|aac|flac|mpg|mpeg|mp3|mp4|m4a|m4v|m4p|oga|ogg|ogv|mov|wav|webm|eot|woff|woff2|ttf|otf)$`)

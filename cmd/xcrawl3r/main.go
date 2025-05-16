@@ -9,8 +9,8 @@ import (
 	"sync"
 
 	hqgologger "github.com/hueristiq/hq-go-logger"
-	"github.com/hueristiq/hq-go-logger/formatter"
-	"github.com/hueristiq/hq-go-logger/levels"
+	hqgologgerformatter "github.com/hueristiq/hq-go-logger/formatter"
+	hqgologgerlevels "github.com/hueristiq/hq-go-logger/levels"
 	"github.com/hueristiq/xcrawl3r/internal/configuration"
 	"github.com/hueristiq/xcrawl3r/internal/input"
 	"github.com/hueristiq/xcrawl3r/internal/output"
@@ -159,16 +159,16 @@ func init() {
 		hqgologger.Fatal().Msg(err.Error())
 	}
 
-	hqgologger.DefaultLogger.SetFormatter(formatter.NewConsoleFormatter(&formatter.ConsoleFormatterConfiguration{
+	hqgologger.DefaultLogger.SetFormatter(hqgologgerformatter.NewConsoleFormatter(&hqgologgerformatter.ConsoleFormatterConfiguration{
 		Colorize: !monochrome,
 	}))
 
 	if silent {
-		hqgologger.DefaultLogger.SetLevel(levels.LevelSilent)
+		hqgologger.DefaultLogger.SetLevel(hqgologgerlevels.LevelSilent)
 	}
 
 	if verbose {
-		hqgologger.DefaultLogger.SetLevel(levels.LevelDebug)
+		hqgologger.DefaultLogger.SetLevel(hqgologgerlevels.LevelDebug)
 	}
 
 	au = aurora.New(aurora.WithColors(!monochrome))
