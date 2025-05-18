@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 
+	hqgohttpheader "github.com/hueristiq/hq-go-http/header"
 	hqgologger "github.com/hueristiq/hq-go-logger"
 	hqgologgerformatter "github.com/hueristiq/hq-go-logger/formatter"
 	hqgologgerlevels "github.com/hueristiq/hq-go-logger/levels"
@@ -253,11 +254,19 @@ func main() {
 		outputs = append(outputs, file)
 	}
 
+	h := viper.GetStringSlice("request.headers")
+
+	h = append(h, []string{
+		fmt.Sprintf("%s: %s %s (https://github.com/hueristiq/%s.git)", hqgohttpheader.UserAgent.String(), configuration.NAME, configuration.VERSION, configuration.NAME),
+	}...)
+
+	h = append(h, headers...)
+
 	cfg := &xcrawl3r.Configuration{
 		Domains:           domains,
 		IncludeSubdomains: includeSubdomains,
 		Delay:             viper.GetInt("request.delay"),
-		Headers:           append(viper.GetStringSlice("request.headers"), headers...),
+		Headers:           h,
 		Timeout:           viper.GetInt("request.timeout"),
 		Proxies:           append(viper.GetStringSlice("proxies"), proxies...),
 		Depth:             viper.GetInt("optimization.depth"),
