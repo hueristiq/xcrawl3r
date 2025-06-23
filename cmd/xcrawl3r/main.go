@@ -65,7 +65,7 @@ func init() {
 	pflag.BoolVarP(&verbose, "verbose", "v", false, "")
 
 	pflag.Usage = func() {
-		hqgologger.Info().Label("").Msg(configuration.BANNER(au))
+		hqgologger.Info(configuration.BANNER(au), hqgologger.WithLabel(""))
 
 		h := "USAGE:\n"
 		h += fmt.Sprintf(" %s [OPTIONS]\n", configuration.NAME)
@@ -121,43 +121,45 @@ func init() {
 		h += " -s, --silent bool                stdout in silent mode\n"
 		h += " -v, --verbose bool               stdout in verbose mode\n"
 
-		hqgologger.Info().Label("").Msg(h)
-		hqgologger.Print().Msg("")
+		hqgologger.Info(h, hqgologger.WithLabel(""))
+		hqgologger.Print("")
 	}
 
 	pflag.Parse()
 
 	if err := configuration.CreateOrUpdate(configurationFilePath); err != nil {
-		hqgologger.Fatal().Msg(err.Error())
+		hqgologger.Fatal("failed creating or updating Configuration!", hqgologger.WithError(err))
 	}
 
 	viper.SetConfigFile(configurationFilePath)
+
 	viper.AutomaticEnv()
+
 	viper.SetEnvPrefix(strings.ToUpper(configuration.NAME))
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
 	if err := viper.ReadInConfig(); err != nil {
-		hqgologger.Fatal().Msg(err.Error())
+		hqgologger.Fatal("failed reading in Configuration!", hqgologger.WithError(err))
 	}
 
 	if err := viper.BindPFlag("request.delay", pflag.Lookup("delay")); err != nil {
-		hqgologger.Fatal().Msg(err.Error())
+		hqgologger.Fatal("failed binding flag!", hqgologger.WithError(err), hqgologger.WithString("flag", "delay"))
 	}
 
 	if err := viper.BindPFlag("request.timeout", pflag.Lookup("timeout")); err != nil {
-		hqgologger.Fatal().Msg(err.Error())
+		hqgologger.Fatal("failed binding flag!", hqgologger.WithError(err), hqgologger.WithString("flag", "timeout"))
 	}
 
 	if err := viper.BindPFlag("optimization.depth", pflag.Lookup("depth")); err != nil {
-		hqgologger.Fatal().Msg(err.Error())
+		hqgologger.Fatal("failed binding flag!", hqgologger.WithError(err), hqgologger.WithString("flag", "depth"))
 	}
 
 	if err := viper.BindPFlag("optimization.concurrency", pflag.Lookup("concurrency")); err != nil {
-		hqgologger.Fatal().Msg(err.Error())
+		hqgologger.Fatal("failed binding flag!", hqgologger.WithError(err), hqgologger.WithString("flag", "concurrency"))
 	}
 
 	if err := viper.BindPFlag("optimization.parallelism", pflag.Lookup("parallelism")); err != nil {
-		hqgologger.Fatal().Msg(err.Error())
+		hqgologger.Fatal("failed binding flag!", hqgologger.WithError(err), hqgologger.WithString("flag", "parallelism"))
 	}
 
 	hqgologger.DefaultLogger.SetFormatter(hqgologgerformatter.NewConsoleFormatter(&hqgologgerformatter.ConsoleFormatterConfiguration{
@@ -176,7 +178,7 @@ func init() {
 }
 
 func main() {
-	hqgologger.Info().Label("").Msg(configuration.BANNER(au))
+	hqgologger.Info(configuration.BANNER(au), hqgologger.WithLabel(""))
 
 	c := viper.GetInt("optimization.concurrency")
 
@@ -194,7 +196,7 @@ func main() {
 		if URLsListFilePath != "" {
 			file, err := os.Open(URLsListFilePath)
 			if err != nil {
-				hqgologger.Error().Msg(err.Error())
+				hqgologger.Fatal("failed opening input file", hqgologger.WithError(err))
 			}
 
 			scanner := bufio.NewScanner(file)
@@ -208,7 +210,7 @@ func main() {
 			}
 
 			if err := scanner.Err(); err != nil {
-				hqgologger.Error().Msg(err.Error())
+				hqgologger.Fatal("failed reading input file!", hqgologger.WithError(err))
 			}
 
 			file.Close()
@@ -226,7 +228,7 @@ func main() {
 			}
 
 			if err := scanner.Err(); err != nil {
-				hqgologger.Error().Msg(err.Error())
+				hqgologger.Fatal("failed reading stdin!", hqgologger.WithError(err))
 			}
 		}
 	}()
@@ -248,7 +250,7 @@ func main() {
 
 		file, err = writer.CreateFile(outputFilePath)
 		if err != nil {
-			hqgologger.Error().Msg(err.Error())
+			hqgologger.Fatal("failed creating output file!", hqgologger.WithError(err), hqgologger.WithString("file", outputFilePath))
 		}
 
 		outputs = append(outputs, file)
@@ -276,7 +278,7 @@ func main() {
 
 	crawler, err := xcrawl3r.New(cfg)
 	if err != nil {
-		hqgologger.Fatal().Msg(err.Error())
+		hqgologger.Fatal("failed creating crawler!", hqgologger.WithError(err))
 	}
 
 	wg := &sync.WaitGroup{}
@@ -295,11 +297,11 @@ func main() {
 						switch result.Type {
 						case xcrawl3r.ResultError:
 							if verbose {
-								hqgologger.Error().Msg(result.Error.Error())
+								hqgologger.Error("error crawling!", hqgologger.WithError(err))
 							}
 						case xcrawl3r.ResultURL:
 							if err := writer.Write(output, result); err != nil {
-								hqgologger.Error().Msg(err.Error())
+								hqgologger.Error("error crawling!", hqgologger.WithError(err))
 							}
 						}
 					}
@@ -314,5 +316,5 @@ func main() {
 		file.Close()
 	}
 
-	hqgologger.Print().Msg("")
+	hqgologger.Print("")
 }
