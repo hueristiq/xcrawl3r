@@ -8,9 +8,10 @@ import (
 	"strings"
 	"sync"
 
+	hqgohttpheader "github.com/hueristiq/hq-go-http/header"
 	hqgologger "github.com/hueristiq/hq-go-logger"
-	"github.com/hueristiq/hq-go-logger/formatter"
-	"github.com/hueristiq/hq-go-logger/levels"
+	hqgologgerformatter "github.com/hueristiq/hq-go-logger/formatter"
+	hqgologgerlevels "github.com/hueristiq/hq-go-logger/levels"
 	"github.com/hueristiq/xcrawl3r/internal/configuration"
 	"github.com/hueristiq/xcrawl3r/internal/input"
 	"github.com/hueristiq/xcrawl3r/internal/output"
@@ -64,7 +65,7 @@ func init() {
 	pflag.BoolVarP(&verbose, "verbose", "v", false, "")
 
 	pflag.Usage = func() {
-		hqgologger.Info().Label("").Msg(configuration.BANNER(au))
+		hqgologger.Info(configuration.BANNER(au), hqgologger.WithLabel(""))
 
 		h := "USAGE:\n"
 		h += fmt.Sprintf(" %s [OPTIONS]\n", configuration.NAME)
@@ -120,62 +121,64 @@ func init() {
 		h += " -s, --silent bool                stdout in silent mode\n"
 		h += " -v, --verbose bool               stdout in verbose mode\n"
 
-		hqgologger.Info().Label("").Msg(h)
-		hqgologger.Print().Msg("")
+		hqgologger.Info(h, hqgologger.WithLabel(""))
+		hqgologger.Print("")
 	}
 
 	pflag.Parse()
 
 	if err := configuration.CreateOrUpdate(configurationFilePath); err != nil {
-		hqgologger.Fatal().Msg(err.Error())
+		hqgologger.Fatal("failed creating or updating Configuration!", hqgologger.WithError(err))
 	}
 
 	viper.SetConfigFile(configurationFilePath)
+
 	viper.AutomaticEnv()
+
 	viper.SetEnvPrefix(strings.ToUpper(configuration.NAME))
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
 	if err := viper.ReadInConfig(); err != nil {
-		hqgologger.Fatal().Msg(err.Error())
+		hqgologger.Fatal("failed reading in Configuration!", hqgologger.WithError(err))
 	}
 
 	if err := viper.BindPFlag("request.delay", pflag.Lookup("delay")); err != nil {
-		hqgologger.Fatal().Msg(err.Error())
+		hqgologger.Fatal("failed binding flag!", hqgologger.WithError(err), hqgologger.WithString("flag", "delay"))
 	}
 
 	if err := viper.BindPFlag("request.timeout", pflag.Lookup("timeout")); err != nil {
-		hqgologger.Fatal().Msg(err.Error())
+		hqgologger.Fatal("failed binding flag!", hqgologger.WithError(err), hqgologger.WithString("flag", "timeout"))
 	}
 
 	if err := viper.BindPFlag("optimization.depth", pflag.Lookup("depth")); err != nil {
-		hqgologger.Fatal().Msg(err.Error())
+		hqgologger.Fatal("failed binding flag!", hqgologger.WithError(err), hqgologger.WithString("flag", "depth"))
 	}
 
 	if err := viper.BindPFlag("optimization.concurrency", pflag.Lookup("concurrency")); err != nil {
-		hqgologger.Fatal().Msg(err.Error())
+		hqgologger.Fatal("failed binding flag!", hqgologger.WithError(err), hqgologger.WithString("flag", "concurrency"))
 	}
 
 	if err := viper.BindPFlag("optimization.parallelism", pflag.Lookup("parallelism")); err != nil {
-		hqgologger.Fatal().Msg(err.Error())
+		hqgologger.Fatal("failed binding flag!", hqgologger.WithError(err), hqgologger.WithString("flag", "parallelism"))
 	}
 
-	hqgologger.DefaultLogger.SetFormatter(formatter.NewConsoleFormatter(&formatter.ConsoleFormatterConfiguration{
+	hqgologger.DefaultLogger.SetFormatter(hqgologgerformatter.NewConsoleFormatter(&hqgologgerformatter.ConsoleFormatterConfiguration{
 		Colorize: !monochrome,
 	}))
 
 	if silent {
-		hqgologger.DefaultLogger.SetMaxLogLevel(levels.LevelSilent)
+		hqgologger.DefaultLogger.SetLevel(hqgologgerlevels.LevelSilent)
 	}
 
 	if verbose {
-		hqgologger.DefaultLogger.SetMaxLogLevel(levels.LevelDebug)
+		hqgologger.DefaultLogger.SetLevel(hqgologgerlevels.LevelDebug)
 	}
 
 	au = aurora.New(aurora.WithColors(!monochrome))
 }
 
 func main() {
-	hqgologger.Info().Label("").Msg(configuration.BANNER(au))
+	hqgologger.Info(configuration.BANNER(au), hqgologger.WithLabel(""))
 
 	c := viper.GetInt("optimization.concurrency")
 
@@ -193,7 +196,7 @@ func main() {
 		if URLsListFilePath != "" {
 			file, err := os.Open(URLsListFilePath)
 			if err != nil {
-				hqgologger.Error().Msg(err.Error())
+				hqgologger.Fatal("failed opening input file", hqgologger.WithError(err))
 			}
 
 			scanner := bufio.NewScanner(file)
@@ -207,7 +210,7 @@ func main() {
 			}
 
 			if err := scanner.Err(); err != nil {
-				hqgologger.Error().Msg(err.Error())
+				hqgologger.Fatal("failed reading input file!", hqgologger.WithError(err))
 			}
 
 			file.Close()
@@ -225,7 +228,7 @@ func main() {
 			}
 
 			if err := scanner.Err(); err != nil {
-				hqgologger.Error().Msg(err.Error())
+				hqgologger.Fatal("failed reading stdin!", hqgologger.WithError(err))
 			}
 		}
 	}()
@@ -247,17 +250,25 @@ func main() {
 
 		file, err = writer.CreateFile(outputFilePath)
 		if err != nil {
-			hqgologger.Error().Msg(err.Error())
+			hqgologger.Fatal("failed creating output file!", hqgologger.WithError(err), hqgologger.WithString("file", outputFilePath))
 		}
 
 		outputs = append(outputs, file)
 	}
 
+	h := viper.GetStringSlice("request.headers")
+
+	h = append(h, []string{
+		fmt.Sprintf("%s: %s %s (https://github.com/hueristiq/%s.git)", hqgohttpheader.UserAgent.String(), configuration.NAME, configuration.VERSION, configuration.NAME),
+	}...)
+
+	h = append(h, headers...)
+
 	cfg := &xcrawl3r.Configuration{
 		Domains:           domains,
 		IncludeSubdomains: includeSubdomains,
 		Delay:             viper.GetInt("request.delay"),
-		Headers:           append(viper.GetStringSlice("request.headers"), headers...),
+		Headers:           h,
 		Timeout:           viper.GetInt("request.timeout"),
 		Proxies:           append(viper.GetStringSlice("proxies"), proxies...),
 		Depth:             viper.GetInt("optimization.depth"),
@@ -267,7 +278,7 @@ func main() {
 
 	crawler, err := xcrawl3r.New(cfg)
 	if err != nil {
-		hqgologger.Fatal().Msg(err.Error())
+		hqgologger.Fatal("failed creating crawler!", hqgologger.WithError(err))
 	}
 
 	wg := &sync.WaitGroup{}
@@ -286,11 +297,11 @@ func main() {
 						switch result.Type {
 						case xcrawl3r.ResultError:
 							if verbose {
-								hqgologger.Error().Msg(result.Error.Error())
+								hqgologger.Error("error crawling!", hqgologger.WithError(err))
 							}
 						case xcrawl3r.ResultURL:
 							if err := writer.Write(output, result); err != nil {
-								hqgologger.Error().Msg(err.Error())
+								hqgologger.Error("error crawling!", hqgologger.WithError(err))
 							}
 						}
 					}
@@ -305,5 +316,5 @@ func main() {
 		file.Close()
 	}
 
-	hqgologger.Print().Msg("")
+	hqgologger.Print("")
 }

@@ -2,7 +2,7 @@
 
 ![made with go](https://img.shields.io/badge/made%20with-Go-1E90FF.svg) [![go report card](https://goreportcard.com/badge/github.com/hueristiq/xcrawl3r)](https://goreportcard.com/report/github.com/hueristiq/xcrawl3r) [![release](https://img.shields.io/github/release/hueristiq/xcrawl3r?style=flat&color=1E90FF)](https://github.com/hueristiq/xcrawl3r/releases) [![open issues](https://img.shields.io/github/issues-raw/hueristiq/xcrawl3r.svg?style=flat&color=1E90FF)](https://github.com/hueristiq/xcrawl3r/issues?q=is:issue+is:open) [![closed issues](https://img.shields.io/github/issues-closed-raw/hueristiq/xcrawl3r.svg?style=flat&color=1E90FF)](https://github.com/hueristiq/xcrawl3r/issues?q=is:issue+is:closed) [![license](https://img.shields.io/badge/license-MIT-gray.svg?color=1E90FF)](https://github.com/hueristiq/xcrawl3r/blob/master/LICENSE) ![maintenance](https://img.shields.io/badge/maintained%3F-yes-1E90FF.svg) [![contribution](https://img.shields.io/badge/contributions-welcome-1E90FF.svg)](https://github.com/hueristiq/xcrawl3r/blob/master/CONTRIBUTING.md)
 
-`xcrawl3r` is a command-line utility designed to recursively spider webpages for URLs. It works by actively traversing websites - following links embedded in webpages, parsing resources like sitemaps and robots.txt files, and even processing local files - to uncover every URL.
+`xcrawl3r` is a command-line utility designed to recursively spider webpages for URLs. It works by actively traversing websites - following links embedded in webpages, and parsing files (including sitemaps & robots.txt) - to uncover every URL.
 
 Unlike [`xurlfind3r`](https://github.com/hueristiq/xurlfind3r/) that doesn't interact directly with the target, `xcrawl3r` interacts directly with the target by spidering its pages in real time. This active approach allows it to discover URLs that may be hidden or unindexed, providing a complete picture of the website’s navigational flow and content distribution. This makes `xcrawl3r` a powerful tool for security researchers, IT professionals, and anyone looking to gain insights into the URLs associated with websites.
 
@@ -23,7 +23,9 @@ Unlike [`xurlfind3r`](https://github.com/hueristiq/xurlfind3r/) that doesn't int
 ## Features
 
 - Recursively spiders webpages for URLs
-- Extract URLs from files (inluding sitemaps & `robots.txt`)
+- Extract URLs from files (including sitemaps & `robots.txt`)
+- Supports `stdin` and `stdout` for easy integration in automated workflows
+- Supports multiple output formats (JSONL, file, stdout)
 - Cross-Platform (Windows, Linux & macOS)
 
 ## Installation

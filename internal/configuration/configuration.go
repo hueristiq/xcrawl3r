@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 
 	"dario.cat/mergo"
-	"github.com/hueristiq/hq-go-http/header"
+	hqgohttpheader "github.com/hueristiq/hq-go-http/header"
 	hqgologger "github.com/hueristiq/hq-go-logger"
 	"github.com/logrusorgru/aurora/v4"
 	"gopkg.in/yaml.v3"
@@ -85,7 +85,7 @@ __  _____ _ __ __ ___      _| |___ / _ __
 
 		userDotConfig, err = os.UserConfigDir()
 		if err != nil {
-			hqgologger.Fatal().Msg(err.Error())
+			hqgologger.Fatal("failed getting `$HOME/.config/`", hqgologger.WithError(err))
 		}
 
 		return
@@ -97,7 +97,7 @@ __  _____ _ __ __ ___      _| |___ / _ __
 		Request: Request{
 			Delay: 0,
 			Headers: []string{
-				fmt.Sprintf("%s: %s v%s (https://github.com/hueristiq/%s)", header.UserAgent, NAME, VERSION, NAME),
+				fmt.Sprintf("%s: %s v%s (https://github.com/hueristiq/%s)", hqgohttpheader.UserAgent, NAME, VERSION, NAME),
 			},
 			Timeout: 10,
 		},
