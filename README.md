@@ -23,7 +23,7 @@ Unlike [`xurlfind3r`](https://github.com/hueristiq/xurlfind3r/) that doesn't int
 ## Features
 
 - Recursively spiders webpages for URLs
-- Extract URLs from files (including sitemaps & `robots.txt`)
+- Extracts URLs from files (including sitemaps & `robots.txt`)
 - Supports `stdin` and `stdout` for easy integration in automated workflows
 - Supports multiple output formats (JSONL, file, stdout)
 - Cross-Platform (Windows, Linux & macOS)
