@@ -85,7 +85,7 @@ __  _____ _ __ __ ___      _| |___ / _ __
 
 		userDotConfig, err = os.UserConfigDir()
 		if err != nil {
-			hqgologger.Fatal("failed getting `$HOME/.config/`", hqgologger.WithError(err))
+			hqgologger.Fatal("failed to get `$HOME/.config/`", hqgologger.WithError(err))
 		}
 
 		return
