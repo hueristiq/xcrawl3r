@@ -65,7 +65,7 @@ func init() {
 	pflag.BoolVarP(&verbose, "verbose", "v", false, "")
 
 	pflag.Usage = func() {
-		hqgologger.Info(configuration.BANNER(au), hqgologger.WithLabel(""))
+		hqgologger.Info(configuration.BANNER(au), hqgologger.WithoutTimestamp(), hqgologger.WithoutLabel())
 
 		h := "USAGE:\n"
 		h += fmt.Sprintf(" %s [OPTIONS]\n", configuration.NAME)
@@ -121,8 +121,8 @@ func init() {
 		h += " -s, --silent bool                disable logging output, only results\n"
 		h += " -v, --verbose bool               enable detailed debug logging output\n"
 
-		hqgologger.Info(h, hqgologger.WithLabel(""))
-		hqgologger.Print("")
+		hqgologger.Info(h, hqgologger.WithoutTimestamp(), hqgologger.WithoutLabel())
+		hqgologger.Print("", hqgologger.WithoutTimestamp(), hqgologger.WithoutLabel())
 	}
 
 	pflag.Parse()
@@ -316,5 +316,5 @@ func main() {
 		file.Close()
 	}
 
-	hqgologger.Print("")
+	hqgologger.Print("", hqgologger.WithoutTimestamp(), hqgologger.WithoutLabel())
 }
