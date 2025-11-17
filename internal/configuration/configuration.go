@@ -61,7 +61,7 @@ func (cfg *Configuration) Write(path string) (err error) {
 
 const (
 	NAME    = "xcrawl3r"
-	VERSION = "1.1.0"
+	VERSION = "1.2.0"
 )
 
 var (
@@ -85,7 +85,7 @@ __  _____ _ __ __ ___      _| |___ / _ __
 
 		userDotConfig, err = os.UserConfigDir()
 		if err != nil {
-			hqgologger.Fatal("failed getting `$HOME/.config/`", hqgologger.WithError(err))
+			hqgologger.Fatal("failed to get `$HOME/.config/`", hqgologger.WithError(err))
 		}
 
 		return
