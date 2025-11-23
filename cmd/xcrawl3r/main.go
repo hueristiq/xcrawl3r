@@ -143,23 +143,23 @@ func init() {
 	}
 
 	if err := viper.BindPFlag("request.delay", pflag.Lookup("delay")); err != nil {
-		hqgologger.Fatal("failed binding flag!", hqgologger.WithError(err), hqgologger.WithString("flag", "delay"))
+		hqgologger.Fatal("failed binding flag!", hqgologger.WithString("flag", "delay"), hqgologger.WithError(err))
 	}
 
 	if err := viper.BindPFlag("request.timeout", pflag.Lookup("timeout")); err != nil {
-		hqgologger.Fatal("failed binding flag!", hqgologger.WithError(err), hqgologger.WithString("flag", "timeout"))
+		hqgologger.Fatal("failed binding flag!", hqgologger.WithString("flag", "timeout"), hqgologger.WithError(err))
 	}
 
 	if err := viper.BindPFlag("optimization.depth", pflag.Lookup("depth")); err != nil {
-		hqgologger.Fatal("failed binding flag!", hqgologger.WithError(err), hqgologger.WithString("flag", "depth"))
+		hqgologger.Fatal("failed binding flag!", hqgologger.WithString("flag", "depth"), hqgologger.WithError(err))
 	}
 
 	if err := viper.BindPFlag("optimization.concurrency", pflag.Lookup("concurrency")); err != nil {
-		hqgologger.Fatal("failed binding flag!", hqgologger.WithError(err), hqgologger.WithString("flag", "concurrency"))
+		hqgologger.Fatal("failed binding flag!", hqgologger.WithString("flag", "concurrency"), hqgologger.WithError(err))
 	}
 
 	if err := viper.BindPFlag("optimization.parallelism", pflag.Lookup("parallelism")); err != nil {
-		hqgologger.Fatal("failed binding flag!", hqgologger.WithError(err), hqgologger.WithString("flag", "parallelism"))
+		hqgologger.Fatal("failed binding flag!", hqgologger.WithString("flag", "parallelism"), hqgologger.WithError(err))
 	}
 
 	hqgologger.DefaultLogger.SetFormatter(hqgologgerformatter.NewConsoleFormatter(&hqgologgerformatter.ConsoleFormatterConfiguration{
@@ -250,7 +250,7 @@ func main() {
 
 		file, err = writer.CreateFile(outputFilePath)
 		if err != nil {
-			hqgologger.Fatal("failed creating output file!", hqgologger.WithError(err), hqgologger.WithString("file", outputFilePath))
+			hqgologger.Fatal("failed creating output file!", hqgologger.WithString("file", outputFilePath), hqgologger.WithError(err))
 		}
 
 		outputs = append(outputs, file)
@@ -297,11 +297,11 @@ func main() {
 						switch result.Type {
 						case xcrawl3r.ResultError:
 							if verbose {
-								hqgologger.Error("error crawling!", hqgologger.WithError(err))
+								hqgologger.Error("failed to find results!", hqgologger.WithError(result.Error))
 							}
 						case xcrawl3r.ResultURL:
 							if err := writer.Write(output, result); err != nil {
-								hqgologger.Error("error crawling!", hqgologger.WithError(err))
+								hqgologger.Error("failed to write result!", hqgologger.WithError(err))
 							}
 						}
 					}
@@ -312,9 +312,7 @@ func main() {
 
 	wg.Wait()
 
-	if file != nil {
-		file.Close()
-	}
+	file.Close()
 
 	hqgologger.Print("", hqgologger.WithoutTimestamp(), hqgologger.WithoutLabel())
 }
