@@ -4,7 +4,7 @@ go 1.25.0
 
 require (
 	dario.cat/mergo v1.0.2
-	github.com/gocolly/colly/v2 v2.2.0
+	github.com/gocolly/colly/v2 v2.3.0
 	github.com/hueristiq/hq-go-http v0.0.0-20251117031730-ab203c7ac13b
 	github.com/hueristiq/hq-go-logger v0.0.0-20251117052147-9f8200693f59
 	github.com/hueristiq/hq-go-url v0.0.0-20251117030909-afc6001dd8c9
