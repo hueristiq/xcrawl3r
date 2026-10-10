@@ -32,10 +32,6 @@ func (c *Crawler) collector(ctx context.Context, scope *scope) (collector *colly
 		return
 	}
 
-	if c.opts.maxPages > 0 {
-		collector.MaxRequests = uint32(c.opts.maxPages)
-	}
-
 	if c.opts.randomUserAgent {
 		collector.OnRequest(func(request *colly.Request) {
 			request.Headers.Set(hqgohttpheader.UserAgent.String(), hqgohttpuseragent.Random())

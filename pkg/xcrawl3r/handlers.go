@@ -105,7 +105,7 @@ func (c *Crawler) registerHandlers(ctx context.Context, collector *colly.Collect
 		if URL := e.Request.AbsoluteURL(link); scope.allows(URL) && strings.Contains(URL, ".min.") {
 			companion := strings.ReplaceAll(URL, ".min.", ".")
 
-			c.visit(ctx, companion, results, func() error {
+			c.visit(ctx, companion, results, scope, func() error {
 				return e.Request.Visit(companion)
 			})
 		}
@@ -126,7 +126,7 @@ func (c *Crawler) handleRobots(ctx context.Context, response *colly.Response, sc
 			continue
 		}
 
-		c.visit(ctx, sitemap, results, func() error {
+		c.visit(ctx, sitemap, results, scope, func() error {
 			return response.Request.Visit(sitemap)
 		})
 	}
@@ -154,12 +154,16 @@ func (c *Crawler) processLink(ctx context.Context, request *colly.Request, link,
 		return
 	}
 
-	c.visit(ctx, URL, results, func() error {
+	c.visit(ctx, URL, results, scope, func() error {
 		return request.Visit(URL)
 	})
 }
 
-func (c *Crawler) visit(ctx context.Context, URL string, results chan<- Result, do func() error) {
+func (c *Crawler) visit(ctx context.Context, URL string, results chan<- Result, scope *scope, do func() error) {
+	if scope.maxPages > 0 && scope.requestCount.Add(1) > uint32(scope.maxPages) {
+		return
+	}
+
 	if err := do(); err != nil && !isExpectedVisitError(err) {
 		emit(ctx, results, Result{
 			Type:  ResultError,
@@ -191,7 +195,6 @@ func isExpectedVisitError(err error) (expected bool) {
 	switch {
 	case errors.As(err, &alreadyVisitedError),
 		errors.Is(err, colly.ErrMaxDepth),
-		errors.Is(err, colly.ErrMaxRequests),
 		errors.Is(err, colly.ErrNoURLFiltersMatch),
 		errors.Is(err, colly.ErrForbiddenDomain),
 		errors.Is(err, colly.ErrRobotsTxtBlocked):

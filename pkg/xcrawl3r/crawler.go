@@ -103,7 +103,7 @@ func (c *Crawler) crawl(ctx context.Context, target string, results chan Result)
 			return
 		}
 
-		c.visit(ctx, target, results, func() error {
+		c.visit(ctx, target, results, scope, func() error {
 			return collector.Visit(target)
 		})
 	}

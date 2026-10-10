@@ -2,6 +2,7 @@ package xcrawl3r
 
 import (
 	"strings"
+	"sync/atomic"
 
 	hqgourlparser "github.com/hueristiq/hq-lib-url-go/parser"
 )
@@ -9,11 +10,15 @@ import (
 type scope struct {
 	domains           []string
 	includeSubdomains bool
+
+	maxPages     int
+	requestCount atomic.Uint32
 }
 
 func (c *Crawler) scopeFor(parsedTargetURL *hqgourlparser.URL) (s *scope) {
 	s = &scope{
 		includeSubdomains: c.opts.includeSubdomains,
+		maxPages:          c.opts.maxPages,
 	}
 
 	if len(c.opts.domains) > 0 {
