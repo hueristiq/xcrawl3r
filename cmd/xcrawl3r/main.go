@@ -33,6 +33,8 @@ var (
 	delay                 int
 	randomDelay           int
 	headers               []string
+	cookies               []string
+	burpFilePath          string
 	timeout               int
 	retries               int
 	proxies               []string
@@ -60,6 +62,8 @@ func init() {
 	pflag.IntVar(&delay, "delay", configuration.DefaultConfiguration.Request.Delay, "")
 	pflag.IntVar(&randomDelay, "random-delay", configuration.DefaultConfiguration.Request.RandomDelay, "")
 	pflag.StringSliceVarP(&headers, "header", "H", []string{}, "")
+	pflag.StringSliceVar(&cookies, "cookie", []string{}, "")
+	pflag.StringVar(&burpFilePath, "burp", "", "")
 	pflag.IntVar(&timeout, "timeout", configuration.DefaultConfiguration.Request.Timeout, "")
 	pflag.IntVar(&retries, "retries", configuration.DefaultConfiguration.Request.Retries, "")
 	pflag.StringSliceVarP(&proxies, "proxy", "p", []string{}, "")
@@ -114,6 +118,8 @@ func init() {
 
 		h += fmt.Sprintf("     --timeout int                time to wait for request in seconds (default: %d)\n", configuration.DefaultConfiguration.Request.Timeout)
 		h += fmt.Sprintf("     --retries int                number of retries for failed requests (default: %d)\n", configuration.DefaultConfiguration.Request.Retries)
+	h += "     --cookie string[]            cookie to include in 'name=value' format\n"
+	h += "     --burp string                burp request file path, headers & cookies are imported\n"
 
 		h += "\nPROXY:\n"
 		h += " -p, --proxy string[]             Proxy (e.g: http://127.0.0.1:8080)\n"
@@ -294,6 +300,21 @@ func main() {
 	h = append(h, []string{
 		fmt.Sprintf("%s: %s %s (https://github.com/hueristiq/%s.git)", hqgohttpheader.UserAgent.String(), configuration.NAME, configuration.VERSION, configuration.NAME),
 	}...)
+
+	if burpFilePath != "" {
+		var burpHeaders []string
+
+		burpHeaders, err := input.ParseBurpRequest(burpFilePath)
+		if err != nil {
+			hqgologger.Fatal("failed parsing burp request file!", hqgologger.WithString("file", burpFilePath), hqgologger.WithError(err))
+		}
+
+		h = append(h, burpHeaders...)
+	}
+
+	if len(cookies) > 0 {
+		h = append(h, "Cookie: "+strings.Join(cookies, "; "))
+	}
 
 	h = append(h, headers...)
 
