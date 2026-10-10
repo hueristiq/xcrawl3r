@@ -11,6 +11,8 @@ import (
 	"github.com/gocolly/colly/v2/debug"
 	"github.com/gocolly/colly/v2/extensions"
 	"github.com/gocolly/colly/v2/proxy"
+	hqgohttpheader "github.com/hueristiq/hq-lib-http-go/header"
+	hqgohttpuseragent "github.com/hueristiq/hq-lib-http-go/useragent"
 )
 
 func (c *Crawler) collector(ctx context.Context, scope *scope) (collector *colly.Collector, err error) {
@@ -28,6 +30,16 @@ func (c *Crawler) collector(ctx context.Context, scope *scope) (collector *colly
 		RandomDelay: c.opts.randomDelay,
 	}); err != nil {
 		return
+	}
+
+	if c.opts.maxPages > 0 {
+		collector.MaxRequests = uint32(c.opts.maxPages)
+	}
+
+	if c.opts.randomUserAgent {
+		collector.OnRequest(func(request *colly.Request) {
+			request.Headers.Set(hqgohttpheader.UserAgent.String(), hqgohttpuseragent.Random())
+		})
 	}
 
 	if len(c.opts.headers) > 0 {

@@ -224,3 +224,125 @@ func TestCrawlDeduplicatesAcrossTargets(t *testing.T) {
 		}
 	}
 }
+
+func TestCrawlMaxPages(t *testing.T) {
+	t.Parallel()
+
+	var requested sync.Map
+
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		requested.Store(r.URL.Path, true)
+
+		w.Header().Set("Content-Type", "text/html")
+
+		for i := range 20 {
+			fmt.Fprintf(w, `<a href="/p%d">p%d</a>`, i, i)
+		}
+	})
+
+	mux.HandleFunc("/robots.txt", func(w http.ResponseWriter, r *http.Request) {
+		requested.Store(r.URL.Path, true)
+
+		fmt.Fprint(w, "User-agent: *\n")
+	})
+
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	const maxPages = 12
+
+	crawler, err := xcrawl3r.New(
+		xcrawl3r.WithDepth(2),
+		xcrawl3r.WithParallelism(1),
+		xcrawl3r.WithMaxPages(maxPages),
+		xcrawl3r.WithTimeout(10*time.Second),
+	)
+	if err != nil {
+		t.Fatalf("xcrawl3r.New() error = %v", err)
+	}
+
+	for result := range crawler.Crawl(t.Context(), server.URL) {
+		if result.Type == xcrawl3r.ResultError {
+			t.Errorf("unexpected error result: %v", result.Error)
+		}
+	}
+
+	count := 0
+
+	requested.Range(func(_, _ any) bool {
+		count++
+
+		return true
+	})
+
+	if count > maxPages {
+		t.Errorf("requested %d pages, want <= %d", count, maxPages)
+	}
+
+	if count < 10 {
+		t.Errorf("requested %d pages, expected seeds plus some linked pages", count)
+	}
+}
+
+func TestCrawlDuration(t *testing.T) {
+	t.Parallel()
+
+	var requested sync.Map
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requested.Store(r.URL.Path, true)
+
+		if r.URL.Path != "/" {
+			time.Sleep(20 * time.Millisecond)
+		}
+
+		w.Header().Set("Content-Type", "text/html")
+
+		if r.URL.Path == "/" {
+			for i := range 200 {
+				fmt.Fprintf(w, `<a href="/p%d">p%d</a>`, i, i)
+			}
+
+			return
+		}
+
+		fmt.Fprint(w, `<html><body></body></html>`)
+	}))
+	defer server.Close()
+
+	crawler, err := xcrawl3r.New(
+		xcrawl3r.WithDepth(2),
+		xcrawl3r.WithParallelism(10),
+		xcrawl3r.WithCrawlDuration(300*time.Millisecond),
+		xcrawl3r.WithTimeout(5*time.Second),
+	)
+	if err != nil {
+		t.Fatalf("xcrawl3r.New() error = %v", err)
+	}
+
+	start := time.Now()
+
+	for result := range crawler.Crawl(t.Context(), server.URL) {
+		if result.Type == xcrawl3r.ResultError {
+			t.Errorf("unexpected error result: %v", result.Error)
+		}
+	}
+
+	if elapsed := time.Since(start); elapsed > 3*time.Second {
+		t.Errorf("crawl took %v, want it capped by crawl duration", elapsed)
+	}
+
+	count := 0
+
+	requested.Range(func(_, _ any) bool {
+		count++
+
+		return true
+	})
+
+	if count >= 200 {
+		t.Errorf("requested %d pages, crawl duration should have cut it short of 200", count)
+	}
+}

@@ -46,47 +46,56 @@ func New(ofs ...OptionFunc) (crawler *Crawler, err error) {
 func (c *Crawler) Crawl(ctx context.Context, target string) <-chan Result {
 	results := make(chan Result)
 
-	go func() {
-		defer close(results)
-
-		parsedTargetURL, err := up.Parse(target)
-		if err != nil {
-			emit(ctx, results, Result{
-				Type:  ResultError,
-				Error: fmt.Errorf("error parsing target %s: %w", target, err),
-			})
-
-			return
-		}
-
-		scope := c.scopeFor(parsedTargetURL)
-
-		collector, err := c.collector(ctx, scope)
-		if err != nil {
-			emit(ctx, results, Result{
-				Type:  ResultError,
-				Error: fmt.Errorf("error creating collector for %s: %w", target, err),
-			})
-
-			return
-		}
-
-		c.registerHandlers(ctx, collector, scope, results)
-
-		for _, target := range c.targets(parsedTargetURL) {
-			if ctx.Err() != nil {
-				return
-			}
-
-			c.visit(ctx, target, results, func() error {
-				return collector.Visit(target)
-			})
-		}
-
-		collector.Wait()
-	}()
+	go c.crawl(ctx, target, results)
 
 	return results
+}
+
+func (c *Crawler) crawl(ctx context.Context, target string, results chan Result) {
+	defer close(results)
+
+	if c.opts.crawlDuration > 0 {
+		var cancel context.CancelFunc
+
+		ctx, cancel = context.WithTimeout(ctx, c.opts.crawlDuration)
+		defer cancel()
+	}
+
+	parsedTargetURL, err := up.Parse(target)
+	if err != nil {
+		emit(ctx, results, Result{
+			Type:  ResultError,
+			Error: fmt.Errorf("error parsing target %s: %w", target, err),
+		})
+
+		return
+	}
+
+	scope := c.scopeFor(parsedTargetURL)
+
+	collector, err := c.collector(ctx, scope)
+	if err != nil {
+		emit(ctx, results, Result{
+			Type:  ResultError,
+			Error: fmt.Errorf("error creating collector for %s: %w", target, err),
+		})
+
+		return
+	}
+
+	c.registerHandlers(ctx, collector, scope, results)
+
+	for _, target := range c.targets(parsedTargetURL) {
+		if ctx.Err() != nil {
+			return
+		}
+
+		c.visit(ctx, target, results, func() error {
+			return collector.Visit(target)
+		})
+	}
+
+	collector.Wait()
 }
 
 var up = hqgourlparser.New(hqgourlparser.WithDefaultScheme("https"))

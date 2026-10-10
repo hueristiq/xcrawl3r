@@ -13,17 +13,20 @@ import (
 )
 
 type Request struct {
-	Delay       int      `yaml:"delay"`
-	RandomDelay int      `yaml:"random_delay"`
-	Headers     []string `yaml:"headers"`
-	Timeout     int      `yaml:"timeout"`
-	Retries     int      `yaml:"retries"`
+	Delay             int      `yaml:"delay"`
+	RandomDelay       int      `yaml:"random_delay"`
+	Headers           []string `yaml:"headers"`
+	Timeout           int      `yaml:"timeout"`
+	Retries           int      `yaml:"retries"`
+	RequestsPerMinute int      `yaml:"requests_per_minute"`
 }
 
 type Optimization struct {
-	Depth       int `yaml:"depth"`
-	Concurrency int `yaml:"concurrency"`
-	Parallelism int `yaml:"parallelism"`
+	Depth         int    `yaml:"depth"`
+	Concurrency   int    `yaml:"concurrency"`
+	Parallelism   int    `yaml:"parallelism"`
+	MaxPages      int    `yaml:"max_pages"`
+	CrawlDuration string `yaml:"crawl_duration"`
 }
 
 type Configuration struct {
@@ -63,7 +66,7 @@ func (cfg *Configuration) Write(path string) (err error) {
 
 const (
 	NAME    = "xcrawl3r"
-	VERSION = "1.3.0"
+	VERSION = "1.4.0"
 )
 
 var (

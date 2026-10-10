@@ -178,6 +178,7 @@ func isExpectedVisitError(err error) (expected bool) {
 	switch {
 	case errors.As(err, &alreadyVisitedError),
 		errors.Is(err, colly.ErrMaxDepth),
+		errors.Is(err, colly.ErrMaxRequests),
 		errors.Is(err, colly.ErrNoURLFiltersMatch),
 		errors.Is(err, colly.ErrForbiddenDomain),
 		errors.Is(err, colly.ErrRobotsTxtBlocked):

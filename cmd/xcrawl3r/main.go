@@ -37,10 +37,14 @@ var (
 	burpFilePath          string
 	timeout               int
 	retries               int
+	requestsPerMinute     int
+	randomAgent           bool
 	proxies               []string
 	depth                 int
 	concurrency           int
 	parallelism           int
+	maxPages              int
+	crawlDuration         string
 	ignoreQuery           bool
 	shapeDedup            bool
 	debug                 bool
@@ -66,10 +70,14 @@ func init() {
 	pflag.StringVar(&burpFilePath, "burp", "", "")
 	pflag.IntVar(&timeout, "timeout", configuration.DefaultConfiguration.Request.Timeout, "")
 	pflag.IntVar(&retries, "retries", configuration.DefaultConfiguration.Request.Retries, "")
+	pflag.IntVar(&requestsPerMinute, "requests-per-minute", configuration.DefaultConfiguration.Request.RequestsPerMinute, "")
+	pflag.BoolVar(&randomAgent, "random-agent", false, "")
 	pflag.StringSliceVarP(&proxies, "proxy", "p", []string{}, "")
 	pflag.IntVar(&depth, "depth", configuration.DefaultConfiguration.Optimization.Depth, "")
 	pflag.IntVarP(&concurrency, "concurrency", "C", configuration.DefaultConfiguration.Optimization.Concurrency, "")
 	pflag.IntVarP(&parallelism, "parallelism", "P", configuration.DefaultConfiguration.Optimization.Parallelism, "")
+	pflag.IntVar(&maxPages, "max-pages", configuration.DefaultConfiguration.Optimization.MaxPages, "")
+	pflag.StringVar(&crawlDuration, "crawl-duration", configuration.DefaultConfiguration.Optimization.CrawlDuration, "")
 	pflag.BoolVar(&ignoreQuery, "ignore-query", false, "")
 	pflag.BoolVar(&shapeDedup, "shape-dedup", false, "")
 	pflag.BoolVar(&debug, "debug", false, "")
@@ -118,6 +126,8 @@ func init() {
 
 		h += fmt.Sprintf("     --timeout int                time to wait for request in seconds (default: %d)\n", configuration.DefaultConfiguration.Request.Timeout)
 		h += fmt.Sprintf("     --retries int                number of retries for failed requests (default: %d)\n", configuration.DefaultConfiguration.Request.Retries)
+	h += "     --random-agent bool          use a random User-Agent for each request\n"
+	h += "     --requests-per-minute int    maximum requests per minute, per host (default: 0, no limit)\n"
 	h += "     --cookie string[]            cookie to include in 'name=value' format\n"
 	h += "     --burp string                burp request file path, headers & cookies are imported\n"
 
@@ -131,6 +141,8 @@ func init() {
 		h += fmt.Sprintf("     --depth int                  maximum depth to crawl, `0` for infinite (default: %d)\n", configuration.DefaultConfiguration.Optimization.Depth)
 		h += fmt.Sprintf(" -C, --concurrency int            number of concurrent inputs to process (default: %d)\n", configuration.DefaultConfiguration.Optimization.Concurrency)
 		h += fmt.Sprintf(" -P, --parallelism int            number of concurrent fetchers to use (default: %d)\n", configuration.DefaultConfiguration.Optimization.Parallelism)
+	h += "     --max-pages int              maximum pages to crawl per target, `0` for no limit (default: 0)\n"
+	h += "     --crawl-duration duration    maximum duration per target crawl (e.g: 10s, 5m), `0` for no limit (default: 0)\n"
 	h += "     --ignore-query bool          deduplicate URLs ignoring the query string\n"
 	h += "     --shape-dedup bool           deduplicate URLs by shape (numbers, UUIDs, dates normalized)\n"
 
@@ -181,6 +193,10 @@ func init() {
 		hqgologger.Fatal("failed binding flag!", hqgologger.WithString("flag", "retries"), hqgologger.WithError(err))
 	}
 
+	if err := viper.BindPFlag("request.requests_per_minute", pflag.Lookup("requests-per-minute")); err != nil {
+		hqgologger.Fatal("failed binding flag!", hqgologger.WithString("flag", "requests-per-minute"), hqgologger.WithError(err))
+	}
+
 	if err := viper.BindPFlag("optimization.depth", pflag.Lookup("depth")); err != nil {
 		hqgologger.Fatal("failed binding flag!", hqgologger.WithString("flag", "depth"), hqgologger.WithError(err))
 	}
@@ -191,6 +207,14 @@ func init() {
 
 	if err := viper.BindPFlag("optimization.parallelism", pflag.Lookup("parallelism")); err != nil {
 		hqgologger.Fatal("failed binding flag!", hqgologger.WithString("flag", "parallelism"), hqgologger.WithError(err))
+	}
+
+	if err := viper.BindPFlag("optimization.max_pages", pflag.Lookup("max-pages")); err != nil {
+		hqgologger.Fatal("failed binding flag!", hqgologger.WithString("flag", "max-pages"), hqgologger.WithError(err))
+	}
+
+	if err := viper.BindPFlag("optimization.crawl_duration", pflag.Lookup("crawl-duration")); err != nil {
+		hqgologger.Fatal("failed binding flag!", hqgologger.WithString("flag", "crawl-duration"), hqgologger.WithError(err))
 	}
 
 	hqgologger.DefaultLogger.SetFormatter(hqgologgerformatter.NewConsoleFormatter(&hqgologgerformatter.ConsoleFormatterConfiguration{
@@ -297,9 +321,11 @@ func main() {
 
 	h := viper.GetStringSlice("request.headers")
 
-	h = append(h, []string{
-		fmt.Sprintf("%s: %s %s (https://github.com/hueristiq/%s.git)", hqgohttpheader.UserAgent.String(), configuration.NAME, configuration.VERSION, configuration.NAME),
-	}...)
+	if !randomAgent {
+		h = append(h, []string{
+			fmt.Sprintf("%s: %s %s (https://github.com/hueristiq/%s.git)", hqgohttpheader.UserAgent.String(), configuration.NAME, configuration.VERSION, configuration.NAME),
+		}...)
+	}
 
 	if burpFilePath != "" {
 		var burpHeaders []string
@@ -318,6 +344,17 @@ func main() {
 
 	h = append(h, headers...)
 
+	var crawlDuration time.Duration
+
+	if viper.GetString("optimization.crawl_duration") != "" {
+		var err error
+
+		crawlDuration, err = time.ParseDuration(viper.GetString("optimization.crawl_duration"))
+		if err != nil {
+			hqgologger.Fatal("failed parsing crawl duration!", hqgologger.WithString("value", viper.GetString("optimization.crawl_duration")), hqgologger.WithError(err))
+		}
+	}
+
 	crawler, err := xcrawl3r.New(
 		xcrawl3r.WithDomains(domains),
 		xcrawl3r.WithIncludeSubdomains(includeSubdomains),
@@ -325,10 +362,14 @@ func main() {
 		xcrawl3r.WithRandomDelay(time.Duration(viper.GetInt("request.random_delay"))*time.Second),
 		xcrawl3r.WithTimeout(time.Duration(viper.GetInt("request.timeout"))*time.Second),
 		xcrawl3r.WithRetries(viper.GetInt("request.retries")),
+		xcrawl3r.WithRequestsPerMinute(viper.GetInt("request.requests_per_minute")),
+		xcrawl3r.WithRandomUserAgent(randomAgent),
 		xcrawl3r.WithHeaders(h...),
 		xcrawl3r.WithProxies(append(viper.GetStringSlice("proxies"), proxies...)...),
 		xcrawl3r.WithDepth(viper.GetInt("optimization.depth")),
 		xcrawl3r.WithParallelism(viper.GetInt("optimization.parallelism")),
+		xcrawl3r.WithMaxPages(viper.GetInt("optimization.max_pages")),
+		xcrawl3r.WithCrawlDuration(crawlDuration),
 		xcrawl3r.WithIgnoreQuery(ignoreQuery),
 		xcrawl3r.WithShapeDedup(shapeDedup),
 		xcrawl3r.WithDebug(debug),

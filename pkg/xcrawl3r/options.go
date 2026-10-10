@@ -14,10 +14,13 @@ type options struct {
 	requestsPerMinute int
 	ignoreQuery       bool
 	shapeDedup        bool
+	randomUserAgent   bool
 	headers           []string
 	proxies           []string
 	depth             int
 	parallelism       int
+	maxPages          int
+	crawlDuration     time.Duration
 	debug             bool
 }
 
@@ -95,6 +98,24 @@ func WithIgnoreQuery(ignoreQuery bool) (f OptionFunc) {
 func WithShapeDedup(shapeDedup bool) (f OptionFunc) {
 	return func(opts *options) {
 		opts.shapeDedup = shapeDedup
+	}
+}
+
+func WithRandomUserAgent(randomUserAgent bool) (f OptionFunc) {
+	return func(opts *options) {
+		opts.randomUserAgent = randomUserAgent
+	}
+}
+
+func WithMaxPages(maxPages int) (f OptionFunc) {
+	return func(opts *options) {
+		opts.maxPages = maxPages
+	}
+}
+
+func WithCrawlDuration(crawlDuration time.Duration) (f OptionFunc) {
+	return func(opts *options) {
+		opts.crawlDuration = crawlDuration
 	}
 }
 
