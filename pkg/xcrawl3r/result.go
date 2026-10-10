@@ -1,9 +1,11 @@
 package xcrawl3r
 
 type Result struct {
-	Type  ResultType
-	Value string
-	Error error
+	Type   ResultType
+	Value  string
+	Source string
+	Via    string
+	Error  error
 }
 
 type ResultType int

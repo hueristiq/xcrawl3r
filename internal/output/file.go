@@ -84,7 +84,9 @@ func (w *Writer) writeTXT(writer io.Writer, result xcrawl3r.Result) (err error) 
 
 func (w *Writer) writeJSON(writer io.Writer, result xcrawl3r.Result) (err error) {
 	data := resultForJSONL{
-		URL: result.Value,
+		URL:    result.Value,
+		Source: result.Source,
+		Via:    result.Via,
 	}
 
 	var dataJSONBytes []byte
@@ -110,7 +112,9 @@ func (w *Writer) writeJSON(writer io.Writer, result xcrawl3r.Result) (err error)
 type format string
 
 type resultForJSONL struct {
-	URL string `json:"url"`
+	URL    string `json:"url"`
+	Source string `json:"source,omitempty"`
+	Via    string `json:"via,omitempty"`
 }
 
 const (

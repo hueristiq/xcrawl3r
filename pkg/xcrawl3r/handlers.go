@@ -56,6 +56,12 @@ func (c *Crawler) registerHandlers(ctx context.Context, collector *colly.Collect
 
 		isHTML := mediatype == "text/html" || mediatype == "application/xhtml+xml"
 
+		via := "regex"
+
+		if isSitemapPath(response.Request.URL.Path) {
+			via = "sitemap"
+		}
+
 		replacer := strings.NewReplacer(
 			"*", "",
 			`\u002f`, "/",
@@ -72,12 +78,12 @@ func (c *Crawler) registerHandlers(ctx context.Context, collector *colly.Collect
 				continue
 			}
 
-			c.processLink(ctx, response.Request, link, scope, results)
+			c.processLink(ctx, response.Request, link, via, scope, results)
 		}
 	})
 
 	collector.OnHTML("[href]", func(e *colly.HTMLElement) {
-		c.processLink(ctx, e.Request, e.Attr("href"), scope, results)
+		c.processLink(ctx, e.Request, e.Attr("href"), "href", scope, results)
 	})
 
 	collector.OnHTML("[src]", func(e *colly.HTMLElement) {
@@ -91,7 +97,7 @@ func (c *Crawler) registerHandlers(ctx context.Context, collector *colly.Collect
 			})
 		}
 
-		c.processLink(ctx, e.Request, link, scope, results)
+		c.processLink(ctx, e.Request, link, "src", scope, results)
 	})
 }
 
@@ -113,11 +119,11 @@ func (c *Crawler) handleRobots(ctx context.Context, response *colly.Response, sc
 	}
 
 	for _, path := range rules.paths {
-		c.processLink(ctx, response.Request, path, scope, results)
+		c.processLink(ctx, response.Request, path, "robots", scope, results)
 	}
 }
 
-func (c *Crawler) processLink(ctx context.Context, request *colly.Request, link string, scope *scope, results chan<- Result) {
+func (c *Crawler) processLink(ctx context.Context, request *colly.Request, link, via string, scope *scope, results chan<- Result) {
 	URL := request.AbsoluteURL(link)
 
 	if !scope.allows(URL) || c.alreadySeen(URL) {
@@ -125,8 +131,10 @@ func (c *Crawler) processLink(ctx context.Context, request *colly.Request, link 
 	}
 
 	result := Result{
-		Type:  ResultURL,
-		Value: URL,
+		Type:   ResultURL,
+		Value:  URL,
+		Source: request.URL.String(),
+		Via:    via,
 	}
 
 	if !emit(ctx, results, result) {
@@ -198,4 +206,10 @@ func isExtractableMediaType(mediatype string) (extractable bool) {
 	}
 
 	return strings.HasSuffix(mediatype, "+json") || strings.HasSuffix(mediatype, "+xml")
+}
+
+func isSitemapPath(rawPath string) (sitemap bool) {
+	rawPath = strings.ToLower(rawPath)
+
+	return strings.HasSuffix(rawPath, ".xml") && strings.Contains(rawPath, "sitemap")
 }

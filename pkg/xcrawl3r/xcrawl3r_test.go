@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -13,6 +14,13 @@ import (
 
 func TestCrawl(t *testing.T) {
 	t.Parallel()
+
+	const (
+		page2Path  = "/page2"
+		appMinJS   = "/app.min.js"
+		sitemapXML = "/sitemap.xml"
+		adminPath  = "/admin"
+	)
 
 	var requested sync.Map
 
@@ -29,6 +37,12 @@ func TestCrawl(t *testing.T) {
 
 		w.Header().Set("Content-Type", "text/html")
 
+		if r.URL.Path != "/" {
+			fmt.Fprint(w, `<html><body></body></html>`)
+
+			return
+		}
+
 		fmt.Fprintf(w, `<html><body>`+
 			`<a href="/page2">p2</a>`+
 			`<a href="/page2#top">top</a>`+
@@ -38,7 +52,7 @@ func TestCrawl(t *testing.T) {
 			`</body></html>`, server.URL)
 	})
 
-	mux.HandleFunc("/page2", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(page2Path, func(w http.ResponseWriter, r *http.Request) {
 		record(r.URL.Path)
 
 		w.Header().Set("Content-Type", "text/html")
@@ -46,7 +60,7 @@ func TestCrawl(t *testing.T) {
 		fmt.Fprint(w, `<html><body><a href="/">home</a><a href="/deep">deep</a></body></html>`)
 	})
 
-	mux.HandleFunc("/app.min.js", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(appMinJS, func(w http.ResponseWriter, r *http.Request) {
 		record(r.URL.Path)
 
 		w.Header().Set("Content-Type", "application/javascript")
@@ -68,7 +82,7 @@ func TestCrawl(t *testing.T) {
 		fmt.Fprintf(w, "User-agent: *\nDisallow: /admin\nDisallow: /private/*\nSitemap: %s/sitemap.xml\n", server.URL)
 	})
 
-	mux.HandleFunc("/sitemap.xml", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(sitemapXML, func(w http.ResponseWriter, r *http.Request) {
 		record(r.URL.Path)
 
 		w.Header().Set("Content-Type", "application/xml")
@@ -89,6 +103,7 @@ func TestCrawl(t *testing.T) {
 	}
 
 	got := make(map[string]int)
+	provenance := make(map[string]xcrawl3r.Result)
 
 	for result := range crawler.Crawl(t.Context(), server.URL) {
 		if result.Type == xcrawl3r.ResultError {
@@ -98,18 +113,22 @@ func TestCrawl(t *testing.T) {
 		}
 
 		got[result.Value]++
+
+		if _, ok := provenance[result.Value]; !ok {
+			provenance[result.Value] = result
+		}
 	}
 
 	expected := []string{
 		"/",
-		"/page2",
+		page2Path,
 		"/deep",
-		"/app.min.js",
+		appMinJS,
 		"/inline",
 		"/from-js",
 		"/from-unmin-js",
 		"/from-sitemap",
-		"/admin",
+		adminPath,
 		"/private/",
 	}
 
@@ -132,7 +151,7 @@ func TestCrawl(t *testing.T) {
 			t.Error("unminified companion should be visited, not emitted")
 		}
 
-		if URL == server.URL+"/sitemap.xml" {
+		if URL == server.URL+sitemapXML {
 			t.Error("sitemap from robots.txt should be visited, not emitted")
 		}
 	}
@@ -141,9 +160,39 @@ func TestCrawl(t *testing.T) {
 		t.Error("/deep is beyond depth 2 and should not have been requested")
 	}
 
-	for _, path := range []string{"/page2", "/app.js", "/sitemap.xml", "/admin", "/private/"} {
+	for _, path := range []string{page2Path, "/app.js", sitemapXML, adminPath, "/private/"} {
 		if _, ok := requested.Load(path); !ok {
 			t.Errorf("expected %s to be requested", path)
+		}
+	}
+
+	provenanceChecks := []struct {
+		path         string
+		via          string
+		sourceSuffix string
+	}{
+		{page2Path, "href", "/"},
+		{appMinJS, "src", "/"},
+		{"/inline", "regex", "/"},
+		{"/from-js", "regex", appMinJS},
+		{"/from-sitemap", "sitemap", sitemapXML},
+		{adminPath, "robots", "/robots.txt"},
+	}
+
+	for _, check := range provenanceChecks {
+		result, ok := provenance[server.URL+check.path]
+		if !ok {
+			t.Errorf("expected %s to be emitted", server.URL+check.path)
+
+			continue
+		}
+
+		if result.Via != check.via {
+			t.Errorf("%s via = %q, want %q", check.path, result.Via, check.via)
+		}
+
+		if !strings.HasSuffix(result.Source, check.sourceSuffix) {
+			t.Errorf("%s source = %q, want suffix %q", check.path, result.Source, check.sourceSuffix)
 		}
 	}
 }
