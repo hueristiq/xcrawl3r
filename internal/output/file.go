@@ -120,8 +120,8 @@ const (
 
 var ErrNoFilePathSpecified = errors.New("no file path specified")
 
-func NewWriter() (writter *Writer) {
-	writter = &Writer{
+func NewWriter() (writer *Writer) {
+	writer = &Writer{
 		format: formatTXT,
 	}
 

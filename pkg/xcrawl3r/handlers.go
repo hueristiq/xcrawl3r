@@ -1,6 +1,7 @@
 package xcrawl3r
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -10,18 +11,28 @@ import (
 	"github.com/gocolly/colly/v2"
 )
 
-func (c *Crawler) registerHandlers(collector *colly.Collector, scope *scope, results chan<- Result) {
+func (c *Crawler) registerHandlers(ctx context.Context, collector *colly.Collector, scope *scope, results chan<- Result) {
 	collector.OnRequest(func(request *colly.Request) {
+		if ctx.Err() != nil {
+			request.Abort()
+
+			return
+		}
+
 		if match := c.fileURLsNotToRequestExtRegex.MatchString(path.Ext(request.URL.Path)); match {
 			request.Abort()
 		}
 	})
 
 	collector.OnError(func(response *colly.Response, err error) {
-		results <- Result{
+		if ctx.Err() != nil {
+			return
+		}
+
+		emit(ctx, results, Result{
 			Type:  ResultError,
 			Error: fmt.Errorf("error requesting %s: %w", response.Request.URL.String(), err),
-		}
+		})
 	})
 
 	collector.OnResponse(func(response *colly.Response) {
@@ -55,12 +66,12 @@ func (c *Crawler) registerHandlers(collector *colly.Collector, scope *scope, res
 				continue
 			}
 
-			c.processLink(response.Request, link, scope, results)
+			c.processLink(ctx, response.Request, link, scope, results)
 		}
 	})
 
 	collector.OnHTML("[href]", func(e *colly.HTMLElement) {
-		c.processLink(e.Request, e.Attr("href"), scope, results)
+		c.processLink(ctx, e.Request, e.Attr("href"), scope, results)
 	})
 
 	collector.OnHTML("[src]", func(e *colly.HTMLElement) {
@@ -69,38 +80,42 @@ func (c *Crawler) registerHandlers(collector *colly.Collector, scope *scope, res
 		if URL := e.Request.AbsoluteURL(link); scope.allows(URL) && strings.Contains(URL, ".min.") {
 			companion := strings.ReplaceAll(URL, ".min.", ".")
 
-			c.visit(companion, results, func() error {
+			c.visit(ctx, companion, results, func() error {
 				return e.Request.Visit(companion)
 			})
 		}
 
-		c.processLink(e.Request, link, scope, results)
+		c.processLink(ctx, e.Request, link, scope, results)
 	})
 }
 
-func (c *Crawler) processLink(request *colly.Request, link string, scope *scope, results chan<- Result) {
+func (c *Crawler) processLink(ctx context.Context, request *colly.Request, link string, scope *scope, results chan<- Result) {
 	URL := request.AbsoluteURL(link)
 
 	if !scope.allows(URL) || c.alreadySeen(URL) {
 		return
 	}
 
-	results <- Result{
+	result := Result{
 		Type:  ResultURL,
 		Value: URL,
 	}
 
-	c.visit(URL, results, func() error {
+	if !emit(ctx, results, result) {
+		return
+	}
+
+	c.visit(ctx, URL, results, func() error {
 		return request.Visit(URL)
 	})
 }
 
-func (c *Crawler) visit(URL string, results chan<- Result, do func() error) {
+func (c *Crawler) visit(ctx context.Context, URL string, results chan<- Result, do func() error) {
 	if err := do(); err != nil && !isExpectedVisitError(err) {
-		results <- Result{
+		emit(ctx, results, Result{
 			Type:  ResultError,
 			Error: fmt.Errorf("error visiting %s: %w", URL, err),
-		}
+		})
 	}
 }
 
@@ -114,6 +129,15 @@ func (c *Crawler) alreadySeen(URL string) (seen bool) {
 	_, seen = c.seen.LoadOrStore(key, struct{}{})
 
 	return
+}
+
+func emit(ctx context.Context, results chan<- Result, result Result) (emitted bool) {
+	select {
+	case results <- result:
+		return true
+	case <-ctx.Done():
+		return false
+	}
 }
 
 func isExpectedVisitError(err error) (expected bool) {

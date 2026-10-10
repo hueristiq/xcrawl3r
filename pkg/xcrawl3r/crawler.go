@@ -1,6 +1,7 @@
 package xcrawl3r
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"sync"
@@ -11,7 +12,7 @@ import (
 )
 
 type Crawler struct {
-	cfg *Configuration
+	opts *options
 
 	urlExtractorRegex *regexp.Regexp
 
@@ -23,74 +24,13 @@ type Crawler struct {
 	seen sync.Map
 }
 
-func (c *Crawler) Crawl(target string) <-chan Result {
-	results := make(chan Result)
-
-	go func() {
-		defer close(results)
-
-		parsedTargetURL, err := up.Parse(target)
-		if err != nil {
-			results <- Result{
-				Type:  ResultError,
-				Error: fmt.Errorf("error parsing target %s: %w", target, err),
-			}
-
-			return
-		}
-
-		scope := c.scopeFor(parsedTargetURL)
-
-		collector, err := c.collector(scope)
-		if err != nil {
-			results <- Result{
-				Type:  ResultError,
-				Error: fmt.Errorf("error creating collector for %s: %w", target, err),
-			}
-
-			return
-		}
-
-		c.registerHandlers(collector, scope, results)
-
-		for _, target := range c.targets(parsedTargetURL) {
-			c.visit(target, results, func() error {
-				return collector.Visit(target)
-			})
-		}
-
-		collector.Wait()
-	}()
-
-	return results
-}
-
-type Configuration struct {
-	Domains           []string
-	IncludeSubdomains bool
-	Delay             int
-	RandomDelay       int
-	Timeout           int
-	Retries           int
-	RequestsPerMinute int
-	Headers           []string
-	Proxies           []string
-	Depth             int
-	Parallelism       int
-	Debug             bool
-}
-
-const defaultRetries = 3
-
-var up = hqgourlparser.New(hqgourlparser.WithDefaultScheme("https"))
-
-func New(cfg *Configuration) (crawler *Crawler, err error) {
+func New(ofs ...OptionFunc) (crawler *Crawler, err error) {
 	crawler = &Crawler{
-		cfg: cfg,
+		opts: defaultOptions(),
 	}
 
-	if cfg.Retries == 0 {
-		cfg.Retries = defaultRetries
+	for _, f := range ofs {
+		f(crawler.opts)
 	}
 
 	crawler.urlExtractorRegex = hqgourlextractor.New().CompileRegex()
@@ -102,3 +42,51 @@ func New(cfg *Configuration) (crawler *Crawler, err error) {
 
 	return
 }
+
+func (c *Crawler) Crawl(ctx context.Context, target string) <-chan Result {
+	results := make(chan Result)
+
+	go func() {
+		defer close(results)
+
+		parsedTargetURL, err := up.Parse(target)
+		if err != nil {
+			emit(ctx, results, Result{
+				Type:  ResultError,
+				Error: fmt.Errorf("error parsing target %s: %w", target, err),
+			})
+
+			return
+		}
+
+		scope := c.scopeFor(parsedTargetURL)
+
+		collector, err := c.collector(ctx, scope)
+		if err != nil {
+			emit(ctx, results, Result{
+				Type:  ResultError,
+				Error: fmt.Errorf("error creating collector for %s: %w", target, err),
+			})
+
+			return
+		}
+
+		c.registerHandlers(ctx, collector, scope, results)
+
+		for _, target := range c.targets(parsedTargetURL) {
+			if ctx.Err() != nil {
+				return
+			}
+
+			c.visit(ctx, target, results, func() error {
+				return collector.Visit(target)
+			})
+		}
+
+		collector.Wait()
+	}()
+
+	return results
+}
+
+var up = hqgourlparser.New(hqgourlparser.WithDefaultScheme("https"))

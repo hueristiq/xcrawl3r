@@ -151,7 +151,7 @@ __  _____ _ __ __ ___      _| |___ / _ __
 \ \/ / __| '__/ _` \ \ /\ / / | |_ \| '__|
  >  < (__| | | (_| |\ V  V /| |___) | |
 /_/\_\___|_|  \__,_| \_/\_/ |_|____/|_|
-                                    v1.2.0
+                                    v1.3.0
 
 USAGE:
  xcrawl3r [OPTIONS]
@@ -174,14 +174,18 @@ SCOPE:
 
      --include-subdomains bool    with domain(s), match subdomains' URLs
 
+ Without `--domain`, only URLs on the target's host are matched.
+
 REQUEST:
      --delay int                  delay between each request in seconds
+     --random-delay int           random delay between each request in seconds
  -H, --header string[]            header to include in 'header:value' format
 
  For multiple headers, use comma(,) separated value with `--header`
  or specify multiple `--header`.
 
      --timeout int                time to wait for request in seconds (default: 10)
+     --retries int                number of retries for failed requests (default: 3)
 
 PROXY:
  -p, --proxy string[]             Proxy (e.g: http://127.0.0.1:8080)

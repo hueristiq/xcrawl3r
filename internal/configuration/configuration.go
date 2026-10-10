@@ -13,15 +13,17 @@ import (
 )
 
 type Request struct {
-	Delay   int      `yaml:"delay"`
-	Headers []string `yaml:"headers"`
-	Timeout int      `yaml:"timeout"`
+	Delay       int      `yaml:"delay"`
+	RandomDelay int      `yaml:"random_delay"`
+	Headers     []string `yaml:"headers"`
+	Timeout     int      `yaml:"timeout"`
+	Retries     int      `yaml:"retries"`
 }
 
 type Optimization struct {
 	Depth       int `yaml:"depth"`
 	Concurrency int `yaml:"concurrency"`
-	Parallelism int `yaml:"Parallelism"`
+	Parallelism int `yaml:"parallelism"`
 }
 
 type Configuration struct {
@@ -35,7 +37,7 @@ func (cfg *Configuration) Write(path string) (err error) {
 	var file *os.File
 
 	directory := filepath.Dir(path)
-	identation := 4
+	indentation := 4
 
 	if _, err = os.Stat(directory); os.IsNotExist(err) {
 		if directory != "" {
@@ -53,7 +55,7 @@ func (cfg *Configuration) Write(path string) (err error) {
 	defer file.Close()
 
 	enc := yaml.NewEncoder(file)
-	enc.SetIndent(identation)
+	enc.SetIndent(indentation)
 	err = enc.Encode(&cfg)
 
 	return
@@ -61,7 +63,7 @@ func (cfg *Configuration) Write(path string) (err error) {
 
 const (
 	NAME    = "xcrawl3r"
-	VERSION = "1.2.0"
+	VERSION = "1.3.0"
 )
 
 var (
@@ -95,11 +97,13 @@ __  _____ _ __ __ ___      _| |___ / _ __
 	DefaultConfiguration         = Configuration{
 		Version: VERSION,
 		Request: Request{
-			Delay: 0,
+			Delay:       0,
+			RandomDelay: 0,
 			Headers: []string{
 				fmt.Sprintf("%s: %s v%s (https://github.com/hueristiq/%s)", hqgohttpheader.UserAgent, NAME, VERSION, NAME),
 			},
 			Timeout: 10,
+			Retries: 3,
 		},
 		Proxies: []string{},
 		Optimization: Optimization{

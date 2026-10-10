@@ -13,13 +13,13 @@ type scope struct {
 
 func (c *Crawler) scopeFor(parsedTargetURL *hqgourlparser.URL) (s *scope) {
 	s = &scope{
-		includeSubdomains: c.cfg.IncludeSubdomains,
+		includeSubdomains: c.opts.includeSubdomains,
 	}
 
-	if len(c.cfg.Domains) > 0 {
-		s.domains = make([]string, 0, len(c.cfg.Domains))
+	if len(c.opts.domains) > 0 {
+		s.domains = make([]string, 0, len(c.opts.domains))
 
-		for _, domain := range c.cfg.Domains {
+		for _, domain := range c.opts.domains {
 			s.domains = append(s.domains, strings.ToLower(domain))
 		}
 	} else {

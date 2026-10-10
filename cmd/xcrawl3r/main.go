@@ -2,11 +2,14 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
 	"strings"
 	"sync"
+	"time"
 
 	hqgohttpheader "github.com/hueristiq/hq-lib-http-go/header"
 	hqgologger "github.com/hueristiq/hq-lib-logger-go"
@@ -23,13 +26,15 @@ import (
 
 var (
 	configurationFilePath string
-	URLs                  []string
-	URLsListFilePath      string
+	urls                  []string
+	urlsListFilePath      string
 	domains               []string
 	includeSubdomains     bool
 	delay                 int
+	randomDelay           int
 	headers               []string
 	timeout               int
+	retries               int
 	proxies               []string
 	depth                 int
 	concurrency           int
@@ -46,13 +51,15 @@ var (
 
 func init() {
 	pflag.StringVarP(&configurationFilePath, "configuration", "c", configuration.DefaultConfigurationFilePath, "")
-	pflag.StringSliceVarP(&URLs, "url", "u", []string{}, "")
-	pflag.StringVarP(&URLsListFilePath, "list", "l", "", "")
+	pflag.StringSliceVarP(&urls, "url", "u", []string{}, "")
+	pflag.StringVarP(&urlsListFilePath, "list", "l", "", "")
 	pflag.StringSliceVarP(&domains, "domain", "d", []string{}, "")
 	pflag.BoolVar(&includeSubdomains, "include-subdomains", false, "")
 	pflag.IntVar(&delay, "delay", configuration.DefaultConfiguration.Request.Delay, "")
+	pflag.IntVar(&randomDelay, "random-delay", configuration.DefaultConfiguration.Request.RandomDelay, "")
 	pflag.StringSliceVarP(&headers, "header", "H", []string{}, "")
 	pflag.IntVar(&timeout, "timeout", configuration.DefaultConfiguration.Request.Timeout, "")
+	pflag.IntVar(&retries, "retries", configuration.DefaultConfiguration.Request.Retries, "")
 	pflag.StringSliceVarP(&proxies, "proxy", "p", []string{}, "")
 	pflag.IntVar(&depth, "depth", configuration.DefaultConfiguration.Optimization.Depth, "")
 	pflag.IntVarP(&concurrency, "concurrency", "C", configuration.DefaultConfiguration.Optimization.Concurrency, "")
@@ -91,14 +98,18 @@ func init() {
 
 		h += "     --include-subdomains bool    with domain(s), match subdomains' URLs\n"
 
+		h += "\n Without `--domain`, only URLs on the target's host are matched.\n"
+
 		h += "\nREQUEST:\n"
 		h += "     --delay int                  delay between each request in seconds\n"
+		h += "     --random-delay int           random delay between each request in seconds\n"
 		h += " -H, --header string[]            header to include in 'header:value' format\n"
 
 		h += "\n For multiple headers, use comma(,) separated value with `--header`\n"
 		h += " or specify multiple `--header`.\n\n"
 
 		h += fmt.Sprintf("     --timeout int                time to wait for request in seconds (default: %d)\n", configuration.DefaultConfiguration.Request.Timeout)
+		h += fmt.Sprintf("     --retries int                number of retries for failed requests (default: %d)\n", configuration.DefaultConfiguration.Request.Retries)
 
 		h += "\nPROXY:\n"
 		h += " -p, --proxy string[]             Proxy (e.g: http://127.0.0.1:8080)\n"
@@ -146,8 +157,16 @@ func init() {
 		hqgologger.Fatal("failed binding flag!", hqgologger.WithString("flag", "delay"), hqgologger.WithError(err))
 	}
 
+	if err := viper.BindPFlag("request.random_delay", pflag.Lookup("random-delay")); err != nil {
+		hqgologger.Fatal("failed binding flag!", hqgologger.WithString("flag", "random-delay"), hqgologger.WithError(err))
+	}
+
 	if err := viper.BindPFlag("request.timeout", pflag.Lookup("timeout")); err != nil {
 		hqgologger.Fatal("failed binding flag!", hqgologger.WithString("flag", "timeout"), hqgologger.WithError(err))
+	}
+
+	if err := viper.BindPFlag("request.retries", pflag.Lookup("retries")); err != nil {
+		hqgologger.Fatal("failed binding flag!", hqgologger.WithString("flag", "retries"), hqgologger.WithError(err))
 	}
 
 	if err := viper.BindPFlag("optimization.depth", pflag.Lookup("depth")); err != nil {
@@ -180,21 +199,33 @@ func init() {
 func main() {
 	hqgologger.Info(configuration.BANNER(au), hqgologger.WithLabel(""))
 
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+
 	c := viper.GetInt("optimization.concurrency")
 
-	URLsChan := make(chan string, c)
+	urlsChan := make(chan string, c)
 
 	go func() {
-		defer close(URLsChan)
+		defer close(urlsChan)
 
-		if len(URLs) > 0 {
-			for _, URL := range URLs {
-				URLsChan <- URL
+		send := func(URL string) (sent bool) {
+			select {
+			case urlsChan <- URL:
+				return true
+			case <-ctx.Done():
+				return false
 			}
 		}
 
-		if URLsListFilePath != "" {
-			file, err := os.Open(URLsListFilePath)
+		for _, URL := range urls {
+			if !send(URL) {
+				return
+			}
+		}
+
+		if urlsListFilePath != "" {
+			file, err := os.Open(urlsListFilePath)
 			if err != nil {
 				hqgologger.Fatal("failed opening input file", hqgologger.WithError(err))
 			}
@@ -202,10 +233,10 @@ func main() {
 			scanner := bufio.NewScanner(file)
 
 			for scanner.Scan() {
-				URL := scanner.Text()
+				if URL := scanner.Text(); URL != "" && !send(URL) {
+					file.Close()
 
-				if URL != "" {
-					URLsChan <- URL
+					return
 				}
 			}
 
@@ -220,10 +251,8 @@ func main() {
 			scanner := bufio.NewScanner(os.Stdin)
 
 			for scanner.Scan() {
-				URL := scanner.Text()
-
-				if URL != "" {
-					URLsChan <- URL
+				if URL := scanner.Text(); URL != "" && !send(URL) {
+					return
 				}
 			}
 
@@ -233,25 +262,23 @@ func main() {
 		}
 	}()
 
-	outputs := []io.Writer{
-		os.Stdout,
-	}
-
 	writer := output.NewWriter()
 
 	if outputInJSONL {
 		writer.SetFormatToJSONL()
 	}
 
-	var file *os.File
+	outputs := []io.Writer{
+		os.Stdout,
+	}
 
 	if outputFilePath != "" {
-		var err error
-
-		file, err = writer.CreateFile(outputFilePath)
+		file, err := writer.CreateFile(outputFilePath)
 		if err != nil {
 			hqgologger.Fatal("failed creating output file!", hqgologger.WithString("file", outputFilePath), hqgologger.WithError(err))
 		}
+
+		defer file.Close()
 
 		outputs = append(outputs, file)
 	}
@@ -264,22 +291,24 @@ func main() {
 
 	h = append(h, headers...)
 
-	cfg := &xcrawl3r.Configuration{
-		Domains:           domains,
-		IncludeSubdomains: includeSubdomains,
-		Delay:             viper.GetInt("request.delay"),
-		Headers:           h,
-		Timeout:           viper.GetInt("request.timeout"),
-		Proxies:           append(viper.GetStringSlice("proxies"), proxies...),
-		Depth:             viper.GetInt("optimization.depth"),
-		Parallelism:       viper.GetInt("optimization.parallelism"),
-		Debug:             debug,
-	}
-
-	crawler, err := xcrawl3r.New(cfg)
+	crawler, err := xcrawl3r.New(
+		xcrawl3r.WithDomains(domains),
+		xcrawl3r.WithIncludeSubdomains(includeSubdomains),
+		xcrawl3r.WithDelay(time.Duration(viper.GetInt("request.delay"))*time.Second),
+		xcrawl3r.WithRandomDelay(time.Duration(viper.GetInt("request.random_delay"))*time.Second),
+		xcrawl3r.WithTimeout(time.Duration(viper.GetInt("request.timeout"))*time.Second),
+		xcrawl3r.WithRetries(viper.GetInt("request.retries")),
+		xcrawl3r.WithHeaders(h...),
+		xcrawl3r.WithProxies(append(viper.GetStringSlice("proxies"), proxies...)...),
+		xcrawl3r.WithDepth(viper.GetInt("optimization.depth")),
+		xcrawl3r.WithParallelism(viper.GetInt("optimization.parallelism")),
+		xcrawl3r.WithDebug(debug),
+	)
 	if err != nil {
 		hqgologger.Fatal("failed creating crawler!", hqgologger.WithError(err))
 	}
+
+	resultsChan := make(chan xcrawl3r.Result)
 
 	wg := &sync.WaitGroup{}
 
@@ -289,30 +318,37 @@ func main() {
 		go func() {
 			defer wg.Done()
 
-			for URL := range URLsChan {
-				results := crawler.Crawl(URL)
-
-				for result := range results {
-					for _, output := range outputs {
-						switch result.Type {
-						case xcrawl3r.ResultError:
-							if verbose {
-								hqgologger.Error("failed to find results!", hqgologger.WithError(result.Error))
-							}
-						case xcrawl3r.ResultURL:
-							if err := writer.Write(output, result); err != nil {
-								hqgologger.Error("failed to write result!", hqgologger.WithError(err))
-							}
-						}
+			for URL := range urlsChan {
+				for result := range crawler.Crawl(ctx, URL) {
+					select {
+					case resultsChan <- result:
+					case <-ctx.Done():
+						return
 					}
 				}
 			}
 		}()
 	}
 
-	wg.Wait()
+	go func() {
+		wg.Wait()
+		close(resultsChan)
+	}()
 
-	file.Close()
+	for result := range resultsChan {
+		switch result.Type {
+		case xcrawl3r.ResultError:
+			if verbose {
+				hqgologger.Error("failed to find results!", hqgologger.WithError(result.Error))
+			}
+		case xcrawl3r.ResultURL:
+			for _, output := range outputs {
+				if err := writer.Write(output, result); err != nil {
+					hqgologger.Error("failed to write result!", hqgologger.WithError(err))
+				}
+			}
+		}
+	}
 
 	hqgologger.Print("", hqgologger.WithoutTimestamp(), hqgologger.WithoutLabel())
 }
