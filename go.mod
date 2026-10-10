@@ -6,7 +6,9 @@ require (
 	dario.cat/mergo v1.0.2
 	github.com/gocolly/colly/v2 v2.2.0
 	github.com/hueristiq/hq-lib-http-go v0.0.0-20261010164008-fdf5b49ddd38
+	github.com/hueristiq/hq-lib-limiter-go v0.0.0-20261010160839-1b14c54eebdf
 	github.com/hueristiq/hq-lib-logger-go v0.0.0-20261010160504-cb0221f01931
+	github.com/hueristiq/hq-lib-retrier-go v0.0.0-20261010161048-3671b972e456
 	github.com/hueristiq/hq-lib-url-go v0.0.0-20261010162221-77019bf7ddc1
 	github.com/logrusorgru/aurora/v4 v4.0.0
 	github.com/spf13/pflag v1.0.10
