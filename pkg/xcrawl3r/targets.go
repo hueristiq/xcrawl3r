@@ -14,12 +14,7 @@ var sitemapPaths = []string{
 	"/sitemap-index.xml",
 	"/sitemapindex.xml",
 	"/sitemap-news.xml",
-	"/post-sitemap.xml",
-	"/page-sitemap.xml",
-	"/portfolio-sitemap.xml",
-	"/home_slider-sitemap.xml",
-	"/category-sitemap.xml",
-	"/author-sitemap.xml",
+	"/wp-sitemap.xml",
 }
 
 func (c *Crawler) targets(parsedTargetURL *hqgourlparser.URL) (targets []string) {

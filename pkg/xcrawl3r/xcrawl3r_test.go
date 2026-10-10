@@ -65,7 +65,7 @@ func TestCrawl(t *testing.T) {
 	mux.HandleFunc("/robots.txt", func(w http.ResponseWriter, r *http.Request) {
 		record(r.URL.Path)
 
-		fmt.Fprintf(w, "Sitemap: %s/sitemap.xml\n", server.URL)
+		fmt.Fprintf(w, "User-agent: *\nDisallow: /admin\nDisallow: /private/*\nSitemap: %s/sitemap.xml\n", server.URL)
 	})
 
 	mux.HandleFunc("/sitemap.xml", func(w http.ResponseWriter, r *http.Request) {
@@ -108,8 +108,9 @@ func TestCrawl(t *testing.T) {
 		"/inline",
 		"/from-js",
 		"/from-unmin-js",
-		"/sitemap.xml",
 		"/from-sitemap",
+		"/admin",
+		"/private/",
 	}
 
 	for _, path := range expected {
@@ -130,13 +131,17 @@ func TestCrawl(t *testing.T) {
 		if URL == server.URL+"/app.js" {
 			t.Error("unminified companion should be visited, not emitted")
 		}
+
+		if URL == server.URL+"/sitemap.xml" {
+			t.Error("sitemap from robots.txt should be visited, not emitted")
+		}
 	}
 
 	if _, ok := requested.Load("/deep"); ok {
 		t.Error("/deep is beyond depth 2 and should not have been requested")
 	}
 
-	for _, path := range []string{"/page2", "/app.js", "/sitemap.xml"} {
+	for _, path := range []string{"/page2", "/app.js", "/sitemap.xml", "/admin", "/private/"} {
 		if _, ok := requested.Load(path); !ok {
 			t.Errorf("expected %s to be requested", path)
 		}

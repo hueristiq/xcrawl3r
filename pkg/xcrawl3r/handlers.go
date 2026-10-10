@@ -36,6 +36,12 @@ func (c *Crawler) registerHandlers(ctx context.Context, collector *colly.Collect
 	})
 
 	collector.OnResponse(func(response *colly.Response) {
+		if strings.EqualFold(response.Request.URL.Path, "/robots.txt") {
+			c.handleRobots(ctx, response, scope, results)
+
+			return
+		}
+
 		contentType := response.Headers.Get("Content-Type")
 		if contentType == "" {
 			contentType = http.DetectContentType(response.Body)
@@ -87,6 +93,28 @@ func (c *Crawler) registerHandlers(ctx context.Context, collector *colly.Collect
 
 		c.processLink(ctx, e.Request, link, scope, results)
 	})
+}
+
+func (c *Crawler) handleRobots(ctx context.Context, response *colly.Response, scope *scope, results chan<- Result) {
+	rules := parseRobots(response.Body)
+
+	for _, sitemap := range rules.sitemaps {
+		if ctx.Err() != nil {
+			return
+		}
+
+		if !scope.allows(sitemap) {
+			continue
+		}
+
+		c.visit(ctx, sitemap, results, func() error {
+			return response.Request.Visit(sitemap)
+		})
+	}
+
+	for _, path := range rules.paths {
+		c.processLink(ctx, response.Request, path, scope, results)
+	}
 }
 
 func (c *Crawler) processLink(ctx context.Context, request *colly.Request, link string, scope *scope, results chan<- Result) {
