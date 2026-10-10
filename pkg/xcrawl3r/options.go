@@ -12,6 +12,8 @@ type options struct {
 	timeout           time.Duration
 	retries           int
 	requestsPerMinute int
+	ignoreQuery       bool
+	shapeDedup        bool
 	headers           []string
 	proxies           []string
 	depth             int
@@ -81,6 +83,18 @@ func WithRetries(retries int) (f OptionFunc) {
 func WithRequestsPerMinute(requestsPerMinute int) (f OptionFunc) {
 	return func(opts *options) {
 		opts.requestsPerMinute = requestsPerMinute
+	}
+}
+
+func WithIgnoreQuery(ignoreQuery bool) (f OptionFunc) {
+	return func(opts *options) {
+		opts.ignoreQuery = ignoreQuery
+	}
+}
+
+func WithShapeDedup(shapeDedup bool) (f OptionFunc) {
+	return func(opts *options) {
+		opts.shapeDedup = shapeDedup
 	}
 }
 

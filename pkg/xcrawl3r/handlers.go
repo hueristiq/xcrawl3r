@@ -156,11 +156,7 @@ func (c *Crawler) visit(ctx context.Context, URL string, results chan<- Result, 
 }
 
 func (c *Crawler) alreadySeen(URL string) (seen bool) {
-	key := URL
-
-	if index := strings.IndexByte(key, '#'); index >= 0 {
-		key = key[:index]
-	}
+	key := normalizeURL(URL, c.opts.ignoreQuery, c.opts.shapeDedup)
 
 	_, seen = c.seen.LoadOrStore(key, struct{}{})
 

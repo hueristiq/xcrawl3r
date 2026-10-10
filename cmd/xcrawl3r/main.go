@@ -39,6 +39,8 @@ var (
 	depth                 int
 	concurrency           int
 	parallelism           int
+	ignoreQuery           bool
+	shapeDedup            bool
 	debug                 bool
 	outputInJSONL         bool
 	outputFilePath        string
@@ -64,6 +66,8 @@ func init() {
 	pflag.IntVar(&depth, "depth", configuration.DefaultConfiguration.Optimization.Depth, "")
 	pflag.IntVarP(&concurrency, "concurrency", "C", configuration.DefaultConfiguration.Optimization.Concurrency, "")
 	pflag.IntVarP(&parallelism, "parallelism", "P", configuration.DefaultConfiguration.Optimization.Parallelism, "")
+	pflag.BoolVar(&ignoreQuery, "ignore-query", false, "")
+	pflag.BoolVar(&shapeDedup, "shape-dedup", false, "")
 	pflag.BoolVar(&debug, "debug", false, "")
 	pflag.BoolVar(&outputInJSONL, "jsonl", false, "")
 	pflag.StringVarP(&outputFilePath, "output", "o", "", "")
@@ -121,6 +125,8 @@ func init() {
 		h += fmt.Sprintf("     --depth int                  maximum depth to crawl, `0` for infinite (default: %d)\n", configuration.DefaultConfiguration.Optimization.Depth)
 		h += fmt.Sprintf(" -C, --concurrency int            number of concurrent inputs to process (default: %d)\n", configuration.DefaultConfiguration.Optimization.Concurrency)
 		h += fmt.Sprintf(" -P, --parallelism int            number of concurrent fetchers to use (default: %d)\n", configuration.DefaultConfiguration.Optimization.Parallelism)
+	h += "     --ignore-query bool          deduplicate URLs ignoring the query string\n"
+	h += "     --shape-dedup bool           deduplicate URLs by shape (numbers, UUIDs, dates normalized)\n"
 
 		h += "\nDEBUG:\n"
 		h += "     --debug bool                 enable debug mode\n"
@@ -302,6 +308,8 @@ func main() {
 		xcrawl3r.WithProxies(append(viper.GetStringSlice("proxies"), proxies...)...),
 		xcrawl3r.WithDepth(viper.GetInt("optimization.depth")),
 		xcrawl3r.WithParallelism(viper.GetInt("optimization.parallelism")),
+		xcrawl3r.WithIgnoreQuery(ignoreQuery),
+		xcrawl3r.WithShapeDedup(shapeDedup),
 		xcrawl3r.WithDebug(debug),
 	)
 	if err != nil {
