@@ -47,6 +47,8 @@ var (
 	crawlDuration         string
 	ignoreQuery           bool
 	shapeDedup            bool
+	headless              bool
+	headlessTimeout       int
 	debug                 bool
 	outputInJSONL         bool
 	outputFilePath        string
@@ -80,6 +82,8 @@ func init() {
 	pflag.StringVar(&crawlDuration, "crawl-duration", configuration.DefaultConfiguration.Optimization.CrawlDuration, "")
 	pflag.BoolVar(&ignoreQuery, "ignore-query", false, "")
 	pflag.BoolVar(&shapeDedup, "shape-dedup", false, "")
+	pflag.BoolVar(&headless, "headless", false, "")
+	pflag.IntVar(&headlessTimeout, "headless-timeout", 10, "")
 	pflag.BoolVar(&debug, "debug", false, "")
 	pflag.BoolVar(&outputInJSONL, "jsonl", false, "")
 	pflag.StringVarP(&outputFilePath, "output", "o", "", "")
@@ -149,7 +153,11 @@ func init() {
 		h += "\nDEBUG:\n"
 		h += "     --debug bool                 enable debug mode\n"
 
-		h += "\nOUTPUT:\n"
+		h += "\nHEADLESS:\n"
+	h += "     --headless bool              render pages in a headless browser, requires Chrome/Chromium\n"
+	h += "     --headless-timeout int       time to wait for page rendering in seconds (default: 10)\n"
+
+	h += "\nOUTPUT:\n"
 		h += "     --jsonl bool                 output in JSONL(ines)\n"
 		h += " -o, --output string              output write file path\n"
 		h += " -m, --monochrome bool            disable colored console output\n"
@@ -372,10 +380,20 @@ func main() {
 		xcrawl3r.WithCrawlDuration(crawlDuration),
 		xcrawl3r.WithIgnoreQuery(ignoreQuery),
 		xcrawl3r.WithShapeDedup(shapeDedup),
+		xcrawl3r.WithHeadless(headless),
+		xcrawl3r.WithHeadlessTimeout(time.Duration(headlessTimeout)*time.Second),
 		xcrawl3r.WithDebug(debug),
 	)
 	if err != nil {
 		hqgologger.Fatal("failed creating crawler!", hqgologger.WithError(err))
+	}
+
+	defer crawler.Close()
+
+	if headless {
+		if err = crawler.Validate(); err != nil {
+			hqgologger.Error("headless rendering unavailable, continuing without it!", hqgologger.WithError(err))
+		}
 	}
 
 	resultsChan := make(chan xcrawl3r.Result)

@@ -134,6 +134,19 @@ Example of environment variables:
 XCRAWL3R_REQUEST_TIMEOUT=10
 ```
 
+## Headless Crawling
+
+With `--headless`, `xcrawl3r` renders each in-scope HTML page in a headless browser and harvests links from the rendered DOM — including links injected by JavaScript and single-page applications, which static crawling cannot see:
+
+```bash
+xcrawl3r -u https://example.com --headless --headless-timeout 15
+```
+
+- Requires Google Chrome or Chromium installed on the system (`chrome`, `chromium` or `chromium-browser` in `PATH`).
+- `--headless-timeout` bounds how long each page rendering may take (default `10` seconds).
+- If no browser is available, `xcrawl3r` logs a warning and continues with static crawling.
+- The Docker image does not ship Chrome — use `--headless` on the host.
+
 ## Usage
 
 To start using `xcrawl3r`, open your terminal and run the following command for a list of options:

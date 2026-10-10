@@ -21,6 +21,8 @@ type Crawler struct {
 
 	storage *storage.InMemoryStorage
 
+	headless *headless
+
 	seen sync.Map
 }
 
@@ -39,6 +41,17 @@ func New(ofs ...OptionFunc) (crawler *Crawler, err error) {
 	crawler.fileURLsNotToRequestExtRegex = regexp.MustCompile(`\.(apng|png|bmp|gif|heif|ico|cur|jpg|jpeg|jfif|pjp|pjpeg|psd|raw|svg|tif|tiff|webp|xbm|3gp|aac|flac|mpg|mpeg|mp3|mp4|m4a|m4v|m4p|oga|ogg|ogv|mov|wav|webm|eot|woff|woff2|ttf|otf)$`)
 
 	crawler.storage = &storage.InMemoryStorage{}
+
+	if crawler.opts.headless {
+		timeout := crawler.opts.headlessTimeout
+		if timeout <= 0 {
+			timeout = defaultHeadlessTimeout
+		}
+
+		crawler.headless = &headless{
+			timeout: timeout,
+		}
+	}
 
 	return
 }

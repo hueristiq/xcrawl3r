@@ -4,6 +4,7 @@ go 1.26.3
 
 require (
 	dario.cat/mergo v1.0.2
+	github.com/chromedp/chromedp v0.20.1
 	github.com/gocolly/colly/v2 v2.2.0
 	github.com/hueristiq/hq-lib-http-go v0.0.0-20261010164008-fdf5b49ddd38
 	github.com/hueristiq/hq-lib-limiter-go v0.0.0-20261010160839-1b14c54eebdf
@@ -23,7 +24,9 @@ require (
 	github.com/antchfx/xmlquery v1.5.0 // indirect
 	github.com/antchfx/xpath v1.3.5 // indirect
 	github.com/bits-and-blooms/bitset v1.24.4 // indirect
+	github.com/chromedp/cdproto v0.157.8 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
+	github.com/go-json-experiment/json v0.0.0-20260213210345-44df1a37e875 // indirect
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect

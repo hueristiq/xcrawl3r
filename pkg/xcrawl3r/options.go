@@ -21,6 +21,8 @@ type options struct {
 	parallelism       int
 	maxPages          int
 	crawlDuration     time.Duration
+	headless          bool
+	headlessTimeout   time.Duration
 	debug             bool
 }
 
@@ -116,6 +118,18 @@ func WithMaxPages(maxPages int) (f OptionFunc) {
 func WithCrawlDuration(crawlDuration time.Duration) (f OptionFunc) {
 	return func(opts *options) {
 		opts.crawlDuration = crawlDuration
+	}
+}
+
+func WithHeadless(headless bool) (f OptionFunc) {
+	return func(opts *options) {
+		opts.headless = headless
+	}
+}
+
+func WithHeadlessTimeout(headlessTimeout time.Duration) (f OptionFunc) {
+	return func(opts *options) {
+		opts.headlessTimeout = headlessTimeout
 	}
 }
 

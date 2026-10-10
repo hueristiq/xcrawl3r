@@ -80,6 +80,19 @@ func (c *Crawler) registerHandlers(ctx context.Context, collector *colly.Collect
 
 			c.processLink(ctx, response.Request, link, via, scope, results)
 		}
+
+		if isHTML && c.headless != nil {
+			var renderedURLs []string
+
+			renderedURLs, err := c.render(ctx, response.Request.URL.String())
+			if err != nil {
+				return
+			}
+
+			for _, link := range renderedURLs {
+				c.processLink(ctx, response.Request, link, "headless", scope, results)
+			}
+		}
 	})
 
 	collector.OnHTML("[href]", func(e *colly.HTMLElement) {
