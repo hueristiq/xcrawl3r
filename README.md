@@ -147,6 +147,25 @@ xcrawl3r -u https://example.com --headless --headless-timeout 15
 - If no browser is available, `xcrawl3r` logs a warning and continues with static crawling.
 - The Docker image does not ship Chrome — use `--headless` on the host.
 
+## Integration
+
+`xcrawl3r` crawls targets actively; [`xurlfind3r`](https://github.com/hueristiq/xurlfind3r/) discovers URLs passively (archives, search engines, certificate logs). Combine them to get the broadest picture:
+
+```bash
+# passive discovery first, then actively crawl every discovered host's root
+xurlfind3r -d example.com --silent | awk -F/ '{print $1"//"$3}' | sort -u | xcrawl3r --depth 2
+```
+
+Or the other way around — crawl first, then enrich with passive sources:
+
+```bash
+xcrawl3r -u https://example.com --silent > active.txt
+xurlfind3r -d example.com --silent > passive.txt
+cat active.txt passive.txt | sort -u > all.txt
+```
+
+`xcrawl3r` reads URLs from `stdin`, `--url`, or `--list`, so it slots into any such pipeline.
+
 ## Usage
 
 To start using `xcrawl3r`, open your terminal and run the following command for a list of options:
@@ -158,13 +177,12 @@ xcrawl3r -h
 Here's what the help message looks like:
 
 ```text
-
                              _ _____
 __  _____ _ __ __ ___      _| |___ / _ __
 \ \/ / __| '__/ _` \ \ /\ / / | |_ \| '__|
  >  < (__| | | (_| |\ V  V /| |___) | |
 /_/\_\___|_|  \__,_| \_/\_/ |_|____/|_|
-                                    v1.3.0
+                                    v1.4.0
 
 USAGE:
  xcrawl3r [OPTIONS]
@@ -199,6 +217,10 @@ REQUEST:
 
      --timeout int                time to wait for request in seconds (default: 10)
      --retries int                number of retries for failed requests (default: 3)
+     --random-agent bool          use a random User-Agent for each request
+     --requests-per-minute int    maximum requests per minute, per host (default: 0, no limit)
+     --cookie string[]            cookie to include in 'name=value' format
+     --burp string                burp request file path, headers & cookies are imported
 
 PROXY:
  -p, --proxy string[]             Proxy (e.g: http://127.0.0.1:8080)
@@ -210,17 +232,24 @@ OPTIMIZATION:
      --depth int                  maximum depth to crawl, `0` for infinite (default: 1)
  -C, --concurrency int            number of concurrent inputs to process (default: 5)
  -P, --parallelism int            number of concurrent fetchers to use (default: 5)
+     --max-pages int              maximum pages to crawl per target, `0` for no limit (default: 0)
+     --crawl-duration duration    maximum duration per target crawl (e.g: 10s, 5m), `0` for no limit (default: 0)
+     --ignore-query bool          deduplicate URLs ignoring the query string
+     --shape-dedup bool           deduplicate URLs by shape (numbers, UUIDs, dates normalized)
 
 DEBUG:
      --debug bool                 enable debug mode
 
+HEADLESS:
+     --headless bool              render pages in a headless browser, requires Chrome/Chromium
+     --headless-timeout int       time to wait for page rendering in seconds (default: 10)
+
 OUTPUT:
      --jsonl bool                 output in JSONL(ines)
  -o, --output string              output write file path
- -m, --monochrome bool            stdout in monochrome
- -s, --silent bool                stdout in silent mode
- -v, --verbose bool               stdout in verbose mode
-
+ -m, --monochrome bool            disable colored console output
+ -s, --silent bool                disable logging output, only results
+ -v, --verbose bool               enable detailed debug logging output
 ```
 
 ## Contributing
