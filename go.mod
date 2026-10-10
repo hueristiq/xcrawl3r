@@ -1,13 +1,13 @@
 module github.com/hueristiq/xcrawl3r
 
-go 1.25.0
+go 1.26.3
 
 require (
 	dario.cat/mergo v1.0.2
 	github.com/gocolly/colly/v2 v2.2.0
-	github.com/hueristiq/hq-go-http v0.0.0-20251117031730-ab203c7ac13b
-	github.com/hueristiq/hq-go-logger v0.0.0-20251117052147-9f8200693f59
-	github.com/hueristiq/hq-go-url v0.0.0-20251117030909-afc6001dd8c9
+	github.com/hueristiq/hq-lib-http-go v0.0.0-20261010164008-fdf5b49ddd38
+	github.com/hueristiq/hq-lib-logger-go v0.0.0-20261010160504-cb0221f01931
+	github.com/hueristiq/hq-lib-url-go v0.0.0-20261010162221-77019bf7ddc1
 	github.com/logrusorgru/aurora/v4 v4.0.0
 	github.com/spf13/pflag v1.0.10
 	github.com/spf13/viper v1.21.0
@@ -26,7 +26,6 @@ require (
 	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
-	github.com/hueristiq/hq-go-errors v0.0.0-20251117025510-4e6c6664fd58 // indirect
 	github.com/kennygrant/sanitize v1.2.4 // indirect
 	github.com/nlnwa/whatwg-url v0.6.2 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
@@ -36,9 +35,9 @@ require (
 	github.com/spf13/cast v1.10.0 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
 	github.com/temoto/robotstxt v1.1.2 // indirect
-	go.yaml.in/yaml/v3 v3.0.4 // indirect
+	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/net v0.47.0 // indirect
-	golang.org/x/sys v0.38.0 // indirect
+	golang.org/x/sys v0.49.0 // indirect
 	golang.org/x/text v0.31.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/protobuf v1.36.10 // indirect

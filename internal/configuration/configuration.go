@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 
 	"dario.cat/mergo"
-	hqgohttpheader "github.com/hueristiq/hq-go-http/header"
-	hqgologger "github.com/hueristiq/hq-go-logger"
+	hqgohttpheader "github.com/hueristiq/hq-lib-http-go/header"
+	hqgologger "github.com/hueristiq/hq-lib-logger-go"
 	"github.com/logrusorgru/aurora/v4"
 	"gopkg.in/yaml.v3"
 )

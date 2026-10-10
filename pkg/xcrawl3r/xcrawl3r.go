@@ -15,8 +15,8 @@ import (
 	"github.com/gocolly/colly/v2/extensions"
 	"github.com/gocolly/colly/v2/proxy"
 	"github.com/gocolly/colly/v2/storage"
-	hqgourlextractor "github.com/hueristiq/hq-go-url/extractor"
-	hqgourlparser "github.com/hueristiq/hq-go-url/parser"
+	hqgourlextractor "github.com/hueristiq/hq-lib-url-go/extractor"
+	hqgourlparser "github.com/hueristiq/hq-lib-url-go/parser"
 )
 
 type Crawler struct {
