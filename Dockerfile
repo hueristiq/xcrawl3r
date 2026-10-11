@@ -4,7 +4,8 @@ RUN <<-EOF
 	apk --no-cache update
 	apk --no-cache upgrade
 
-	apk --no-cache add ca-certificates curl gcc g++ git make
+	# bash is required by the Makefile's SHELL = /bin/bash directive.
+	apk --no-cache add bash ca-certificates curl gcc g++ git make
 EOF
 
 WORKDIR /usr/src/xcrawl3r
