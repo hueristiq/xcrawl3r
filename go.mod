@@ -6,11 +6,11 @@ require (
 	dario.cat/mergo v1.0.2
 	github.com/chromedp/chromedp v0.21.0
 	github.com/gocolly/colly/v2 v2.3.0
-	github.com/hueristiq/hq-lib-http-go v0.0.0-20261011093801-27e3c457fcd8
-	github.com/hueristiq/hq-lib-limiter-go v0.0.0-20261010160839-1b14c54eebdf
-	github.com/hueristiq/hq-lib-logger-go v0.0.0-20261010160504-cb0221f01931
-	github.com/hueristiq/hq-lib-retrier-go v0.0.0-20261010161048-3671b972e456
-	github.com/hueristiq/hq-lib-url-go v0.0.0-20261010162221-77019bf7ddc1
+	github.com/hueristiq/hq-lib-http-go v0.0.0-20261011140034-f591e873d968
+	github.com/hueristiq/hq-lib-limiter-go v0.0.0-20261011131819-8eb9d2ee722a
+	github.com/hueristiq/hq-lib-logger-go v0.0.0-20261011132023-c2e708c1233d
+	github.com/hueristiq/hq-lib-retrier-go v0.0.0-20261011132200-c4007130d81a
+	github.com/hueristiq/hq-lib-url-go v0.0.0-20261011135834-c92a0bfe9148
 	github.com/logrusorgru/aurora/v4 v4.0.0
 	github.com/spf13/pflag v1.0.10
 	github.com/spf13/viper v1.21.0
