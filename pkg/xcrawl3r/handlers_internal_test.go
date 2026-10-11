@@ -56,3 +56,31 @@ func TestVisitCountsOnlySuccessfulVisits(t *testing.T) {
 		t.Errorf("do() calls = %d, want 6", got)
 	}
 }
+
+func TestIsSitemapPath(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		rawPath string
+		want    bool
+	}{
+		{"/sitemap.xml", true},
+		{"/sitemap.xml.gz", true},
+		{"/sitemap_index.xml.gz", true},
+		{"/SITEMAP.XML", true},
+		{"/wp-sitemap.xml", true},
+		{"/foo.xml", false},
+		{"/sitemap.html", false},
+		{"/robots.txt", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.rawPath, func(t *testing.T) {
+			t.Parallel()
+
+			if got := isSitemapPath(tt.rawPath); got != tt.want {
+				t.Errorf("isSitemapPath(%q) = %v, want %v", tt.rawPath, got, tt.want)
+			}
+		})
+	}
+}

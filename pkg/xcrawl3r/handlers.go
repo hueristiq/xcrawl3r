@@ -1,6 +1,7 @@
 package xcrawl3r
 
 import (
+	"compress/gzip"
 	"context"
 	"errors"
 	"fmt"
@@ -19,13 +20,20 @@ func (c *Crawler) registerHandlers(ctx context.Context, collector *colly.Collect
 			return
 		}
 
-		if match := c.fileURLsNotToRequestExtRegex.MatchString(path.Ext(request.URL.Path)); match {
+		if match := c.fileURLsNotToRequestExtRegex.MatchString(path.Ext(strings.ToLower(request.URL.Path))); match {
 			request.Abort()
 		}
 	})
 
 	collector.OnError(func(response *colly.Response, err error) {
 		if ctx.Err() != nil {
+			return
+		}
+
+		// Probing /sitemap.xml.gz on servers that do not actually serve gzip
+		// (or return 404 HTML) makes colly fail with gzip.ErrHeader; that is
+		// an expected probe outcome, not an error worth surfacing.
+		if isNonGzippedXMLGZProbe(response.Request.URL.String(), err) {
 			return
 		}
 
@@ -50,7 +58,13 @@ func (c *Crawler) registerHandlers(ctx context.Context, collector *colly.Collect
 		mediatype, _, _ := strings.Cut(contentType, ";")
 		mediatype = strings.TrimSpace(strings.ToLower(mediatype))
 
-		if !isExtractableMediaType(mediatype) && !c.fileURLsToRequestExtRegex.MatchString(path.Ext(response.Request.URL.Path)) {
+		rawPath := strings.ToLower(response.Request.URL.Path)
+
+		switch {
+		case isExtractableMediaType(mediatype):
+		case c.fileURLsToRequestExtRegex.MatchString(path.Ext(rawPath)):
+		case strings.HasSuffix(rawPath, ".xml.gz"): // colly gunzips *.xml.gz responses.
+		default:
 			return
 		}
 
@@ -228,6 +242,16 @@ func isExpectedVisitError(err error) (expected bool) {
 	return
 }
 
+// isNonGzippedXMLGZProbe reports whether err is the expected outcome of
+// requesting a *.xml.gz URL from a server that does not serve gzip there.
+func isNonGzippedXMLGZProbe(rawURL string, err error) (expected bool) {
+	if !strings.HasSuffix(strings.ToLower(rawURL), ".xml.gz") {
+		return
+	}
+
+	return errors.Is(err, gzip.ErrHeader)
+}
+
 func isExtractableMediaType(mediatype string) (extractable bool) {
 	if strings.HasPrefix(mediatype, "text/") {
 		return true
@@ -248,5 +272,9 @@ func isExtractableMediaType(mediatype string) (extractable bool) {
 func isSitemapPath(rawPath string) (sitemap bool) {
 	rawPath = strings.ToLower(rawPath)
 
-	return strings.HasSuffix(rawPath, ".xml") && strings.Contains(rawPath, "sitemap")
+	if !strings.Contains(rawPath, "sitemap") {
+		return
+	}
+
+	return strings.HasSuffix(rawPath, ".xml") || strings.HasSuffix(rawPath, ".xml.gz")
 }

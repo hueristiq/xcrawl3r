@@ -84,6 +84,31 @@ func TestNormalizeURL(t *testing.T) {
 			stripShape: true,
 			expected:   "https://example.com/users/{}?a=1",
 		},
+		{
+			name:     "empty path becomes root",
+			raw:      "https://example.com",
+			expected: "https://example.com/",
+		},
+		{
+			name:     "uppercase host lowercased",
+			raw:      "https://EXAMPLE.com/x",
+			expected: "https://example.com/x",
+		},
+		{
+			name:     "default https port stripped",
+			raw:      "https://example.com:443/x",
+			expected: "https://example.com/x",
+		},
+		{
+			name:     "default http port stripped",
+			raw:      "http://example.com:80/x",
+			expected: "http://example.com/x",
+		},
+		{
+			name:     "non-default port kept",
+			raw:      "https://example.com:8443/x",
+			expected: "https://example.com:8443/x",
+		},
 	}
 
 	for _, tt := range tests {

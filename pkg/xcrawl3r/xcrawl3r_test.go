@@ -1,6 +1,7 @@
 package xcrawl3r_test
 
 import (
+	"compress/gzip"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -390,6 +391,132 @@ func TestCrawlTLSVerification(t *testing.T) {
 			t.Error("expected TLS verification errors")
 		}
 	})
+}
+
+func TestCrawlCaseInsensitiveExtensionFilters(t *testing.T) {
+	t.Parallel()
+
+	var requested sync.Map
+
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+
+		_, _ = fmt.Fprint(w, `<html><body>`+
+			`<script src="/app.JS"></script>`+
+			`<img src="/image.PNG">`+
+			`<link rel="stylesheet" href="/style.CSS">`+
+			`</body></html>`)
+	})
+
+	for _, path := range []string{"/app.JS", "/style.CSS", "/image.PNG"} {
+		mux.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
+			requested.Store(r.URL.Path, true)
+
+			w.Header().Set("Content-Type", "application/octet-stream")
+
+			_, _ = fmt.Fprint(w, "payload")
+		})
+	}
+
+	mux.HandleFunc("/robots.txt", func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = fmt.Fprint(w, "User-agent: *\n")
+	})
+
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	crawler, err := xcrawl3r.New(
+		xcrawl3r.WithDepth(2),
+		xcrawl3r.WithParallelism(4),
+		xcrawl3r.WithTimeout(10*time.Second),
+	)
+	if err != nil {
+		t.Fatalf("xcrawl3r.New() error = %v", err)
+	}
+
+	for result := range crawler.Crawl(t.Context(), server.URL) {
+		if result.Type == xcrawl3r.ResultError {
+			t.Errorf("unexpected error result: %v", result.Error)
+		}
+	}
+
+	for _, path := range []string{"/app.JS", "/style.CSS"} {
+		if _, ok := requested.Load(path); !ok {
+			t.Errorf("expected %s to be requested (uppercase extensions must be extractable)", path)
+		}
+	}
+
+	if _, ok := requested.Load("/image.PNG"); ok {
+		t.Error("expected /image.PNG not to be requested (uppercase media extensions must be filtered)")
+	}
+}
+
+func TestCrawlGzippedSitemap(t *testing.T) {
+	t.Parallel()
+
+	var requested sync.Map
+
+	var server *httptest.Server
+
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+
+		_, _ = fmt.Fprint(w, `<html><body></body></html>`)
+	})
+
+	mux.HandleFunc("/robots.txt", func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = fmt.Fprint(w, "User-agent: *\n")
+	})
+
+	mux.HandleFunc("/sitemap.xml.gz", func(w http.ResponseWriter, _ *http.Request) {
+		requested.Store("/sitemap.xml.gz", true)
+
+		w.Header().Set("Content-Type", "application/xml")
+
+		gz := gzip.NewWriter(w)
+		_, _ = fmt.Fprintf(gz, `<urlset><url><loc>%s/from-gz-sitemap</loc></url></urlset>`, server.URL)
+		_ = gz.Close()
+	})
+
+	server = httptest.NewServer(mux)
+	defer server.Close()
+
+	crawler, err := xcrawl3r.New(
+		xcrawl3r.WithDepth(1),
+		xcrawl3r.WithParallelism(4),
+		xcrawl3r.WithTimeout(10*time.Second),
+	)
+	if err != nil {
+		t.Fatalf("xcrawl3r.New() error = %v", err)
+	}
+
+	got := make(map[string]bool)
+
+	for result := range crawler.Crawl(t.Context(), server.URL) {
+		if result.Type == xcrawl3r.ResultError {
+			t.Errorf("unexpected error result: %v", result.Error)
+
+			continue
+		}
+
+		got[result.Value] = true
+	}
+
+	if _, ok := requested.Load("/sitemap.xml.gz"); !ok {
+		t.Error("expected /sitemap.xml.gz probe to be requested")
+	}
+
+	if !got[server.URL+"/from-gz-sitemap"] {
+		t.Errorf("expected %s/from-gz-sitemap to be emitted", server.URL)
+	}
+
+	if got[server.URL+"/loc"] || got[server.URL+"/url"] || got[server.URL+"/urlset"] {
+		t.Error("closing-tag junk emitted from gzipped sitemap")
+	}
 }
 
 func TestCrawlDeduplicatesAcrossTargets(t *testing.T) {

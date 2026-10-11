@@ -1,6 +1,7 @@
 package xcrawl3r
 
 import (
+	"net/url"
 	"regexp"
 	"strings"
 )
@@ -13,7 +14,25 @@ var (
 )
 
 func normalizeURL(rawURL string, stripQuery, stripShape bool) (normalized string) {
-	normalized = rawURL
+	parsedURL, err := url.Parse(rawURL)
+	if err != nil {
+		return rawURL
+	}
+
+	// Canonicalize the authority: lowercase the host, strip default ports,
+	// and give host-only URLs the root path so the seed and "/" from
+	// robots/href deduplicate into one key.
+	parsedURL.Host = strings.ToLower(parsedURL.Host)
+
+	if port := parsedURL.Port(); port == "80" || port == "443" {
+		parsedURL.Host = parsedURL.Hostname()
+	}
+
+	if parsedURL.Path == "" {
+		parsedURL.Path = "/"
+	}
+
+	normalized = parsedURL.String()
 
 	if index := strings.IndexByte(normalized, '#'); index >= 0 {
 		normalized = normalized[:index]

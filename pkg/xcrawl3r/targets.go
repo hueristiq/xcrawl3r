@@ -9,6 +9,7 @@ import (
 
 var sitemapPaths = []string{
 	"/sitemap.xml",
+	"/sitemap.xml.gz",
 	"/sitemap_news.xml",
 	"/sitemap_index.xml",
 	"/sitemap-index.xml",
