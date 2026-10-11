@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"dario.cat/mergo"
 	hqgohttpheader "github.com/hueristiq/hq-lib-http-go/header"
@@ -125,6 +126,19 @@ __  _____ _ __ __ ___      _| |___ / _ __
 		},
 	}
 )
+
+// WithDefaultUserAgent appends the built-in User-Agent header to headers when
+// none of the entries is a User-Agent header.
+func WithDefaultUserAgent(headers []string) (withUserAgent []string) {
+	for _, header := range headers {
+		key, _, found := strings.Cut(header, ":")
+		if found && strings.EqualFold(strings.TrimSpace(key), hqgohttpheader.UserAgent.String()) {
+			return headers
+		}
+	}
+
+	return append(headers, DefaultUserAgent)
+}
 
 func CreateOrUpdate(path string) (err error) {
 	var cfg Configuration

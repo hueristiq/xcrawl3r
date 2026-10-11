@@ -8,25 +8,26 @@ import (
 type OptionFunc func(*options)
 
 type options struct {
-	domains           []string
-	includeSubdomains bool
-	delay             time.Duration
-	randomDelay       time.Duration
-	timeout           time.Duration
-	retries           int
-	requestsPerMinute int
-	ignoreQuery       bool
-	shapeDedup        bool
-	randomUserAgent   bool
-	headers           []string
-	proxies           []string
-	depth             int
-	parallelism       int
-	maxPages          int
-	crawlDuration     time.Duration
-	headless          bool
-	headlessTimeout   time.Duration
-	debug             bool
+	domains            []string
+	includeSubdomains  bool
+	delay              time.Duration
+	randomDelay        time.Duration
+	timeout            time.Duration
+	retries            int
+	requestsPerMinute  int
+	ignoreQuery        bool
+	shapeDedup         bool
+	randomUserAgent    bool
+	insecureSkipVerify bool
+	headers            []string
+	proxies            []string
+	depth              int
+	parallelism        int
+	maxPages           int
+	crawlDuration      time.Duration
+	headless           bool
+	headlessTimeout    time.Duration
+	debug              bool
 }
 
 const (
@@ -38,10 +39,11 @@ const (
 
 func defaultOptions() (opts *options) {
 	return &options{
-		timeout:     defaultTimeout,
-		retries:     defaultRetries,
-		depth:       defaultDepth,
-		parallelism: defaultParallelism,
+		timeout:            defaultTimeout,
+		retries:            defaultRetries,
+		depth:              defaultDepth,
+		parallelism:        defaultParallelism,
+		insecureSkipVerify: true,
 	}
 }
 
@@ -124,6 +126,16 @@ func WithShapeDedup(shapeDedup bool) (f OptionFunc) {
 func WithRandomUserAgent(randomUserAgent bool) (f OptionFunc) {
 	return func(opts *options) {
 		opts.randomUserAgent = randomUserAgent
+	}
+}
+
+// WithInsecureSkipVerify controls TLS certificate verification. It defaults to
+// true: crawling with an invalid certificate still works, which is the common
+// recon case. Set it to false to enforce verification against targets the
+// operator controls.
+func WithInsecureSkipVerify(insecureSkipVerify bool) (f OptionFunc) {
+	return func(opts *options) {
+		opts.insecureSkipVerify = insecureSkipVerify
 	}
 }
 

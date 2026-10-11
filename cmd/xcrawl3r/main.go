@@ -11,7 +11,6 @@ import (
 	"sync"
 	"time"
 
-	hqgohttpheader "github.com/hueristiq/hq-lib-http-go/header"
 	hqgologger "github.com/hueristiq/hq-lib-logger-go"
 	hqgologgerformatter "github.com/hueristiq/hq-lib-logger-go/formatter"
 	hqgologgerlevels "github.com/hueristiq/hq-lib-logger-go/levels"
@@ -40,6 +39,7 @@ var (
 	retries               int
 	requestsPerMinute     int
 	randomAgent           bool
+	insecureSkipVerify    bool
 	proxies               []string
 	depth                 int
 	concurrency           int
@@ -75,6 +75,7 @@ func init() {
 	pflag.IntVar(&retries, "retries", configuration.DefaultConfiguration.Request.Retries, "")
 	pflag.IntVar(&requestsPerMinute, "requests-per-minute", configuration.DefaultConfiguration.Request.RequestsPerMinute, "")
 	pflag.BoolVar(&randomAgent, "random-agent", false, "")
+	pflag.BoolVar(&insecureSkipVerify, "insecure-skip-verify", true, "skip TLS certificate verification")
 	pflag.StringSliceVarP(&proxies, "proxy", "p", []string{}, "")
 	pflag.IntVar(&depth, "depth", configuration.DefaultConfiguration.Optimization.Depth, "")
 	pflag.IntVarP(&concurrency, "concurrency", "C", configuration.DefaultConfiguration.Optimization.Concurrency, "")
@@ -132,6 +133,7 @@ func init() {
 		h += fmt.Sprintf("     --timeout int                time to wait for request in seconds (default: %d)\n", configuration.DefaultConfiguration.Request.Timeout)
 		h += fmt.Sprintf("     --retries int                number of retries for failed requests (default: %d)\n", configuration.DefaultConfiguration.Request.Retries)
 		h += "     --random-agent bool          use a random User-Agent for each request\n"
+		h += "     --insecure-skip-verify bool  skip TLS certificate verification (default: true)\n"
 		h += "     --requests-per-minute int    maximum requests per minute, per host (default: 0, no limit)\n"
 		h += "     --cookie string[]            cookie to include in 'name=value' format\n"
 		h += "     --burp string                burp request file path, headers & cookies are imported\n"
@@ -343,9 +345,7 @@ func main() {
 	h := viper.GetStringSlice("request.headers")
 
 	if !randomAgent {
-		h = append(h, []string{
-			fmt.Sprintf("%s: %s %s (https://github.com/hueristiq/%s.git)", hqgohttpheader.UserAgent.String(), configuration.Name, configuration.Version, configuration.Name),
-		}...)
+		h = configuration.WithDefaultUserAgent(h)
 	}
 
 	if burpFilePath != "" {
@@ -385,6 +385,7 @@ func main() {
 		xcrawl3r.WithRetries(viper.GetInt("request.retries")),
 		xcrawl3r.WithRequestsPerMinute(viper.GetInt("request.requests_per_minute")),
 		xcrawl3r.WithRandomUserAgent(randomAgent),
+		xcrawl3r.WithInsecureSkipVerify(insecureSkipVerify),
 		xcrawl3r.WithHeaders(h...),
 		xcrawl3r.WithProxies(append(viper.GetStringSlice("proxies"), proxies...)...),
 		xcrawl3r.WithDepth(viper.GetInt("optimization.depth")),

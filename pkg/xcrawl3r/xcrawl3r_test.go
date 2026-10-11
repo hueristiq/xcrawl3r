@@ -288,6 +288,110 @@ func TestNewValidatesOptions(t *testing.T) {
 	}
 }
 
+func TestCrawlUsesConfiguredUserAgent(t *testing.T) {
+	t.Parallel()
+
+	var userAgents sync.Map
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		userAgents.Store(r.URL.Path, r.UserAgent())
+
+		w.Header().Set("Content-Type", "text/html")
+
+		_, _ = fmt.Fprint(w, `<html><body></body></html>`)
+	}))
+	defer server.Close()
+
+	crawler, err := xcrawl3r.New(
+		xcrawl3r.WithHeaders("User-Agent: custom-agent/1.0"),
+		xcrawl3r.WithTimeout(10*time.Second),
+	)
+	if err != nil {
+		t.Fatalf("xcrawl3r.New() error = %v", err)
+	}
+
+	for result := range crawler.Crawl(t.Context(), server.URL) {
+		if result.Type == xcrawl3r.ResultError {
+			t.Errorf("unexpected error result: %v", result.Error)
+		}
+	}
+
+	userAgent, ok := userAgents.Load("/")
+	if !ok {
+		t.Fatal("no request recorded for /")
+	}
+
+	if userAgent != "custom-agent/1.0" {
+		t.Errorf("User-Agent = %q, want %q", userAgent, "custom-agent/1.0")
+	}
+}
+
+func TestCrawlTLSVerification(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+
+		_, _ = fmt.Fprint(w, `<html><body><a href="/page">p</a></body></html>`)
+	}))
+	t.Cleanup(server.Close)
+
+	t.Run("insecure by default finds results", func(t *testing.T) {
+		t.Parallel()
+
+		crawler, err := xcrawl3r.New(
+			xcrawl3r.WithTimeout(10 * time.Second),
+		)
+		if err != nil {
+			t.Fatalf("xcrawl3r.New() error = %v", err)
+		}
+
+		var found bool
+
+		for result := range crawler.Crawl(t.Context(), server.URL) {
+			if result.Type == xcrawl3r.ResultURL && result.Value == server.URL+"/page" {
+				found = true
+			}
+		}
+
+		if !found {
+			t.Error("expected /page to be found against a self-signed certificate")
+		}
+	})
+
+	t.Run("verification enforced rejects self-signed", func(t *testing.T) {
+		t.Parallel()
+
+		crawler, err := xcrawl3r.New(
+			xcrawl3r.WithTimeout(10*time.Second),
+			xcrawl3r.WithInsecureSkipVerify(false),
+		)
+		if err != nil {
+			t.Fatalf("xcrawl3r.New() error = %v", err)
+		}
+
+		var found, sawError bool
+
+		for result := range crawler.Crawl(t.Context(), server.URL) {
+			switch result.Type {
+			case xcrawl3r.ResultError:
+				sawError = true
+			case xcrawl3r.ResultURL:
+				found = true
+			case xcrawl3r.ResultWarning:
+			}
+		}
+
+		if found {
+			t.Error("URLs found despite TLS verification failure")
+		}
+
+		if !sawError {
+			t.Error("expected TLS verification errors")
+		}
+	})
+}
+
 func TestCrawlDeduplicatesAcrossTargets(t *testing.T) {
 	t.Parallel()
 

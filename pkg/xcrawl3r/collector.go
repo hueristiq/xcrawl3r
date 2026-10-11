@@ -73,7 +73,7 @@ func (c *Crawler) collector(ctx context.Context, scope *scope, results chan<- Re
 		IdleConnTimeout:     c.opts.timeout,
 		TLSHandshakeTimeout: c.opts.timeout,
 		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: true, //nolint:gosec // default for recon; opt-out flag lands with the request-semantics fixes.
+			InsecureSkipVerify: c.opts.insecureSkipVerify, //nolint:gosec // user-controllable via WithInsecureSkipVerify/--insecure-skip-verify, default insecure.
 			Renegotiation:      tls.RenegotiateOnceAsClient,
 		},
 	}
