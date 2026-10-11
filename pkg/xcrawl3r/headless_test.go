@@ -42,7 +42,7 @@ func TestCrawlHeadless(t *testing.T) {
 
 		w.Header().Set("Content-Type", "text/html")
 
-		fmt.Fprint(w, `<html><body><div id="root"></div>`+
+		_, _ = fmt.Fprint(w, `<html><body><div id="root"></div>`+
 			`<script>document.getElementById("root").innerHTML = '<a href="/js-page">spa</a>';</script>`+
 			`</body></html>`)
 	})
@@ -52,7 +52,7 @@ func TestCrawlHeadless(t *testing.T) {
 
 		w.Header().Set("Content-Type", "text/html")
 
-		fmt.Fprint(w, `<html><body></body></html>`)
+		_, _ = fmt.Fprint(w, `<html><body></body></html>`)
 	})
 
 	server := httptest.NewServer(mux)

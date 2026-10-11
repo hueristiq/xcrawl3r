@@ -50,27 +50,31 @@ func (cfg *Configuration) Write(path string) (err error) {
 		}
 	}
 
+	//nolint:gosec // path is the user-provided configuration file path.
 	file, err = os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
 		return
 	}
 
-	defer file.Close()
+	defer func() {
+		_ = file.Close()
+	}()
 
 	enc := yaml.NewEncoder(file)
 	enc.SetIndent(indentation)
-	err = enc.Encode(&cfg)
+	err = enc.Encode(cfg)
 
 	return
 }
 
-const (
-	NAME    = "xcrawl3r"
-	VERSION = "1.4.0"
-)
+const Name = "xcrawl3r"
+
+// Version is the tool version. It is a variable so build pipelines can stamp
+// it with -ldflags "-X .../internal/configuration.Version=<version>".
+var Version = "1.4.0"
 
 var (
-	BANNER = func(au *aurora.Aurora) (banner string) {
+	Banner = func(au *aurora.Aurora) (banner string) {
 		banner = au.Sprintf(
 			au.BrightBlue(`
                              _ _____
@@ -79,7 +83,7 @@ __  _____ _ __ __ ___      _| |___ / _ __
  >  < (__| | | (_| |\ V  V /| |___) | |
 /_/\_\___|_|  \__,_| \_/\_/ |_|____/|_|
                                     %s`).Bold(),
-			au.BrightRed("v"+VERSION).Bold().Italic(),
+			au.BrightRed("v"+Version).Bold().Italic(),
 		) + "\n\n"
 
 		return
@@ -96,14 +100,19 @@ __  _____ _ __ __ ___      _| |___ / _ __
 		return
 	}()
 
-	DefaultConfigurationFilePath = filepath.Join(UserDotConfigDirectoryPath, NAME, "config.yaml")
-	DefaultConfiguration         = Configuration{
-		Version: VERSION,
+	// DefaultUserAgent is the built-in User-Agent header value, applied only
+	// when no User-Agent is configured.
+	DefaultUserAgent = fmt.Sprintf("%s: %s v%s (https://github.com/hueristiq/%s)", hqgohttpheader.UserAgent, Name, Version, Name)
+
+	DefaultConfigurationFilePath = filepath.Join(UserDotConfigDirectoryPath, Name, "config.yaml")
+
+	DefaultConfiguration = Configuration{
+		Version: Version,
 		Request: Request{
 			Delay:       0,
 			RandomDelay: 0,
 			Headers: []string{
-				fmt.Sprintf("%s: %s v%s (https://github.com/hueristiq/%s)", hqgohttpheader.UserAgent, NAME, VERSION, NAME),
+				DefaultUserAgent,
 			},
 			Timeout: 10,
 			Retries: 3,
@@ -137,12 +146,12 @@ func CreateOrUpdate(path string) (err error) {
 			return
 		}
 
-		if cfg.Version != VERSION {
+		if cfg.Version != Version {
 			if err = mergo.Merge(&cfg, DefaultConfiguration); err != nil {
 				return
 			}
 
-			cfg.Version = VERSION
+			cfg.Version = Version
 
 			if err = cfg.Write(path); err != nil {
 				return
@@ -156,12 +165,15 @@ func CreateOrUpdate(path string) (err error) {
 func Read(path string) (cfg Configuration, err error) {
 	var file *os.File
 
+	//nolint:gosec // path is the user-provided configuration file path.
 	file, err = os.Open(path)
 	if err != nil {
 		return
 	}
 
-	defer file.Close()
+	defer func() {
+		_ = file.Close()
+	}()
 
 	if err = yaml.NewDecoder(file).Decode(&cfg); err != nil {
 		return

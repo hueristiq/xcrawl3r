@@ -58,7 +58,9 @@ func TestRoundTripperRetriesOnRetryableStatus(t *testing.T) {
 	rt := &roundTripper{base: http.DefaultTransport, retries: 3}
 
 	response := roundTrip(t, rt, server.URL)
-	defer response.Body.Close()
+	defer func() {
+		_ = response.Body.Close()
+	}()
 
 	if response.StatusCode != http.StatusOK {
 		t.Errorf("RoundTrip() status = %d, want %d", response.StatusCode, http.StatusOK)
@@ -78,7 +80,9 @@ func TestRoundTripperReturnsLastResponseWhenRetriesExhausted(t *testing.T) {
 	rt := &roundTripper{base: http.DefaultTransport, retries: 3}
 
 	response := roundTrip(t, rt, server.URL)
-	defer response.Body.Close()
+	defer func() {
+		_ = response.Body.Close()
+	}()
 
 	if response.StatusCode != http.StatusServiceUnavailable {
 		t.Errorf("RoundTrip() status = %d, want %d", response.StatusCode, http.StatusServiceUnavailable)
@@ -98,7 +102,9 @@ func TestRoundTripperRetriesDisabled(t *testing.T) {
 	rt := &roundTripper{base: http.DefaultTransport, retries: 1}
 
 	response := roundTrip(t, rt, server.URL)
-	defer response.Body.Close()
+	defer func() {
+		_ = response.Body.Close()
+	}()
 
 	if response.StatusCode != http.StatusServiceUnavailable {
 		t.Errorf("RoundTrip() status = %d, want %d", response.StatusCode, http.StatusServiceUnavailable)
@@ -123,7 +129,7 @@ func TestRoundTripperRateLimitSpacesRequests(t *testing.T) {
 		response := roundTrip(t, rt, server.URL)
 
 		_, _ = io.Copy(io.Discard, response.Body)
-		response.Body.Close()
+		_ = response.Body.Close()
 	}
 
 	if elapsed := time.Since(start); elapsed < 50*time.Millisecond {

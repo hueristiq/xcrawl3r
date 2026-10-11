@@ -16,6 +16,7 @@ var (
 func ParseBurpRequest(path string) (headers []string, err error) {
 	var file *os.File
 
+	//nolint:gosec // path is the user-provided burp request file path.
 	file, err = os.Open(path)
 	if err != nil {
 		err = fmt.Errorf("failed to open burp request file: %w", err)
@@ -23,7 +24,9 @@ func ParseBurpRequest(path string) (headers []string, err error) {
 		return
 	}
 
-	defer file.Close()
+	defer func() {
+		_ = file.Close()
+	}()
 
 	scanner := bufio.NewScanner(file)
 	scanner.Buffer(make([]byte, 64*1024), 1024*1024)

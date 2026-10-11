@@ -60,7 +60,7 @@ func (rt *roundTripper) RoundTrip(req *http.Request) (response *http.Response, e
 			}
 
 			_, _ = io.Copy(io.Discard, response.Body)
-			response.Body.Close()
+			_ = response.Body.Close()
 
 			return nil, &retryableStatusError{statusCode: response.StatusCode}
 		}

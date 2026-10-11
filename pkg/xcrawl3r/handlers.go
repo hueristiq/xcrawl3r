@@ -160,8 +160,10 @@ func (c *Crawler) processLink(ctx context.Context, request *colly.Request, link,
 }
 
 func (c *Crawler) visit(ctx context.Context, URL string, results chan<- Result, scope *scope, do func() error) {
-	if scope.maxPages > 0 && scope.requestCount.Add(1) > uint32(scope.maxPages) {
-		return
+	if scope.maxPages > 0 {
+		if scope.requestCount.Add(1) > uint32(scope.maxPages) { //nolint:gosec // guarded by maxPages > 0; validated non-negative at option time.
+			return
+		}
 	}
 
 	if err := do(); err != nil && !isExpectedVisitError(err) {

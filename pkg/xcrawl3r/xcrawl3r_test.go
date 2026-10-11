@@ -38,12 +38,12 @@ func TestCrawl(t *testing.T) {
 		w.Header().Set("Content-Type", "text/html")
 
 		if r.URL.Path != "/" {
-			fmt.Fprint(w, `<html><body></body></html>`)
+			_, _ = fmt.Fprint(w, `<html><body></body></html>`)
 
 			return
 		}
 
-		fmt.Fprintf(w, `<html><body>`+
+		_, _ = fmt.Fprintf(w, `<html><body>`+
 			`<a href="/page2">p2</a>`+
 			`<a href="/page2#top">top</a>`+
 			`<a href="https://out-of-scope.example.com/x">x</a>`+
@@ -57,7 +57,7 @@ func TestCrawl(t *testing.T) {
 
 		w.Header().Set("Content-Type", "text/html")
 
-		fmt.Fprint(w, `<html><body><a href="/">home</a><a href="/deep">deep</a></body></html>`)
+		_, _ = fmt.Fprint(w, `<html><body><a href="/">home</a><a href="/deep">deep</a></body></html>`)
 	})
 
 	mux.HandleFunc(appMinJS, func(w http.ResponseWriter, r *http.Request) {
@@ -65,7 +65,7 @@ func TestCrawl(t *testing.T) {
 
 		w.Header().Set("Content-Type", "application/javascript")
 
-		fmt.Fprintf(w, `var u = "%s/from-js";`, server.URL)
+		_, _ = fmt.Fprintf(w, `var u = "%s/from-js";`, server.URL)
 	})
 
 	mux.HandleFunc("/app.js", func(w http.ResponseWriter, r *http.Request) {
@@ -73,13 +73,13 @@ func TestCrawl(t *testing.T) {
 
 		w.Header().Set("Content-Type", "application/javascript")
 
-		fmt.Fprintf(w, `var u = "%s/from-unmin-js";`, server.URL)
+		_, _ = fmt.Fprintf(w, `var u = "%s/from-unmin-js";`, server.URL)
 	})
 
 	mux.HandleFunc("/robots.txt", func(w http.ResponseWriter, r *http.Request) {
 		record(r.URL.Path)
 
-		fmt.Fprintf(w, "User-agent: *\nDisallow: /admin\nDisallow: /private/*\nSitemap: %s/sitemap.xml\n", server.URL)
+		_, _ = fmt.Fprintf(w, "User-agent: *\nDisallow: /admin\nDisallow: /private/*\nSitemap: %s/sitemap.xml\n", server.URL)
 	})
 
 	mux.HandleFunc(sitemapXML, func(w http.ResponseWriter, r *http.Request) {
@@ -87,7 +87,7 @@ func TestCrawl(t *testing.T) {
 
 		w.Header().Set("Content-Type", "application/xml")
 
-		fmt.Fprintf(w, `<urlset><url><loc>%s/from-sitemap</loc></url></urlset>`, server.URL)
+		_, _ = fmt.Fprintf(w, `<urlset><url><loc>%s/from-sitemap</loc></url></urlset>`, server.URL)
 	})
 
 	server = httptest.NewServer(mux)
@@ -203,7 +203,7 @@ func TestCrawlDeduplicatesAcrossTargets(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
 
-		fmt.Fprint(w, `<html><body><a href="/page">p</a></body></html>`)
+		_, _ = fmt.Fprint(w, `<html><body><a href="/page">p</a></body></html>`)
 	}))
 	defer server.Close()
 
@@ -238,14 +238,14 @@ func TestCrawlMaxPages(t *testing.T) {
 		w.Header().Set("Content-Type", "text/html")
 
 		for i := range 20 {
-			fmt.Fprintf(w, `<a href="/p%d">p%d</a>`, i, i)
+			_, _ = fmt.Fprintf(w, `<a href="/p%d">p%d</a>`, i, i)
 		}
 	})
 
 	mux.HandleFunc("/robots.txt", func(w http.ResponseWriter, r *http.Request) {
 		requested.Store(r.URL.Path, true)
 
-		fmt.Fprint(w, "User-agent: *\n")
+		_, _ = fmt.Fprint(w, "User-agent: *\n")
 	})
 
 	server := httptest.NewServer(mux)
@@ -298,13 +298,13 @@ func TestCrawlDuration(t *testing.T) {
 
 		if r.URL.Path == "/" {
 			for i := range 200 {
-				fmt.Fprintf(w, `<a href="/p%d">p%d</a>`, i, i)
+				_, _ = fmt.Fprintf(w, `<a href="/p%d">p%d</a>`, i, i)
 			}
 
 			return
 		}
 
-		fmt.Fprint(w, `<html><body></body></html>`)
+		_, _ = fmt.Fprint(w, `<html><body></body></html>`)
 	}))
 	defer server.Close()
 

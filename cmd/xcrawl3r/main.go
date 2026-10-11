@@ -15,13 +15,14 @@ import (
 	hqgologger "github.com/hueristiq/hq-lib-logger-go"
 	hqgologgerformatter "github.com/hueristiq/hq-lib-logger-go/formatter"
 	hqgologgerlevels "github.com/hueristiq/hq-lib-logger-go/levels"
+	"github.com/logrusorgru/aurora/v4"
+	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
+
 	"github.com/hueristiq/xcrawl3r/internal/configuration"
 	"github.com/hueristiq/xcrawl3r/internal/input"
 	"github.com/hueristiq/xcrawl3r/internal/output"
 	"github.com/hueristiq/xcrawl3r/pkg/xcrawl3r"
-	"github.com/logrusorgru/aurora/v4"
-	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
 )
 
 var (
@@ -92,10 +93,10 @@ func init() {
 	pflag.BoolVarP(&verbose, "verbose", "v", false, "")
 
 	pflag.Usage = func() {
-		hqgologger.Info(configuration.BANNER(au), hqgologger.WithoutTimestamp(), hqgologger.WithoutLabel())
+		hqgologger.Info(configuration.Banner(au), hqgologger.WithoutTimestamp(), hqgologger.WithoutLabel())
 
 		h := "USAGE:\n"
-		h += fmt.Sprintf(" %s [OPTIONS]\n", configuration.NAME)
+		h += fmt.Sprintf(" %s [OPTIONS]\n", configuration.Name)
 
 		h += "\nCONFIGURATION:\n"
 
@@ -130,10 +131,10 @@ func init() {
 
 		h += fmt.Sprintf("     --timeout int                time to wait for request in seconds (default: %d)\n", configuration.DefaultConfiguration.Request.Timeout)
 		h += fmt.Sprintf("     --retries int                number of retries for failed requests (default: %d)\n", configuration.DefaultConfiguration.Request.Retries)
-	h += "     --random-agent bool          use a random User-Agent for each request\n"
-	h += "     --requests-per-minute int    maximum requests per minute, per host (default: 0, no limit)\n"
-	h += "     --cookie string[]            cookie to include in 'name=value' format\n"
-	h += "     --burp string                burp request file path, headers & cookies are imported\n"
+		h += "     --random-agent bool          use a random User-Agent for each request\n"
+		h += "     --requests-per-minute int    maximum requests per minute, per host (default: 0, no limit)\n"
+		h += "     --cookie string[]            cookie to include in 'name=value' format\n"
+		h += "     --burp string                burp request file path, headers & cookies are imported\n"
 
 		h += "\nPROXY:\n"
 		h += " -p, --proxy string[]             Proxy (e.g: http://127.0.0.1:8080)\n"
@@ -145,19 +146,19 @@ func init() {
 		h += fmt.Sprintf("     --depth int                  maximum depth to crawl, `0` for infinite (default: %d)\n", configuration.DefaultConfiguration.Optimization.Depth)
 		h += fmt.Sprintf(" -C, --concurrency int            number of concurrent inputs to process (default: %d)\n", configuration.DefaultConfiguration.Optimization.Concurrency)
 		h += fmt.Sprintf(" -P, --parallelism int            number of concurrent fetchers to use (default: %d)\n", configuration.DefaultConfiguration.Optimization.Parallelism)
-	h += "     --max-pages int              maximum pages to crawl per target, `0` for no limit (default: 0)\n"
-	h += "     --crawl-duration duration    maximum duration per target crawl (e.g: 10s, 5m), `0` for no limit (default: 0)\n"
-	h += "     --ignore-query bool          deduplicate URLs ignoring the query string\n"
-	h += "     --shape-dedup bool           deduplicate URLs by shape (numbers, UUIDs, dates normalized)\n"
+		h += "     --max-pages int              maximum pages to crawl per target, `0` for no limit (default: 0)\n"
+		h += "     --crawl-duration duration    maximum duration per target crawl (e.g: 10s, 5m), `0` for no limit (default: 0)\n"
+		h += "     --ignore-query bool          deduplicate URLs ignoring the query string\n"
+		h += "     --shape-dedup bool           deduplicate URLs by shape (numbers, UUIDs, dates normalized)\n"
 
 		h += "\nDEBUG:\n"
 		h += "     --debug bool                 enable debug mode\n"
 
 		h += "\nHEADLESS:\n"
-	h += "     --headless bool              render pages in a headless browser, requires Chrome/Chromium\n"
-	h += "     --headless-timeout int       time to wait for page rendering in seconds (default: 10)\n"
+		h += "     --headless bool              render pages in a headless browser, requires Chrome/Chromium\n"
+		h += "     --headless-timeout int       time to wait for page rendering in seconds (default: 10)\n"
 
-	h += "\nOUTPUT:\n"
+		h += "\nOUTPUT:\n"
 		h += "     --jsonl bool                 output in JSONL(ines)\n"
 		h += " -o, --output string              output write file path\n"
 		h += " -m, --monochrome bool            disable colored console output\n"
@@ -178,7 +179,7 @@ func init() {
 
 	viper.AutomaticEnv()
 
-	viper.SetEnvPrefix(strings.ToUpper(configuration.NAME))
+	viper.SetEnvPrefix(strings.ToUpper(configuration.Name))
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
 	if err := viper.ReadInConfig(); err != nil {
@@ -230,18 +231,22 @@ func init() {
 	}))
 
 	if silent {
-		hqgologger.DefaultLogger.SetLevel(hqgologgerlevels.LevelSilent)
+		if err := hqgologger.DefaultLogger.SetLevel(hqgologgerlevels.LevelSilent); err != nil {
+			hqgologger.Fatal("failed setting logger level!", hqgologger.WithError(err))
+		}
 	}
 
 	if verbose {
-		hqgologger.DefaultLogger.SetLevel(hqgologgerlevels.LevelDebug)
+		if err := hqgologger.DefaultLogger.SetLevel(hqgologgerlevels.LevelDebug); err != nil {
+			hqgologger.Fatal("failed setting logger level!", hqgologger.WithError(err))
+		}
 	}
 
 	au = aurora.New(aurora.WithColors(!monochrome))
 }
 
 func main() {
-	hqgologger.Info(configuration.BANNER(au), hqgologger.WithLabel(""))
+	hqgologger.Info(configuration.Banner(au), hqgologger.WithLabel(""))
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
@@ -269,17 +274,20 @@ func main() {
 		}
 
 		if urlsListFilePath != "" {
+			//nolint:gosec // path is the user-provided input file path.
 			file, err := os.Open(urlsListFilePath)
 			if err != nil {
 				hqgologger.Fatal("failed opening input file", hqgologger.WithError(err))
 			}
 
+			defer func() {
+				_ = file.Close()
+			}()
+
 			scanner := bufio.NewScanner(file)
 
 			for scanner.Scan() {
 				if URL := scanner.Text(); URL != "" && !send(URL) {
-					file.Close()
-
 					return
 				}
 			}
@@ -287,8 +295,6 @@ func main() {
 			if err := scanner.Err(); err != nil {
 				hqgologger.Fatal("failed reading input file!", hqgologger.WithError(err))
 			}
-
-			file.Close()
 		}
 
 		if input.HasStdin() {
@@ -322,7 +328,9 @@ func main() {
 			hqgologger.Fatal("failed creating output file!", hqgologger.WithString("file", outputFilePath), hqgologger.WithError(err))
 		}
 
-		defer file.Close()
+		defer func() {
+			_ = file.Close()
+		}()
 
 		outputs = append(outputs, file)
 	}
@@ -331,7 +339,7 @@ func main() {
 
 	if !randomAgent {
 		h = append(h, []string{
-			fmt.Sprintf("%s: %s %s (https://github.com/hueristiq/%s.git)", hqgohttpheader.UserAgent.String(), configuration.NAME, configuration.VERSION, configuration.NAME),
+			fmt.Sprintf("%s: %s %s (https://github.com/hueristiq/%s.git)", hqgohttpheader.UserAgent.String(), configuration.Name, configuration.Version, configuration.Name),
 		}...)
 	}
 

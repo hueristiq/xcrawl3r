@@ -51,6 +51,7 @@ func (w *Writer) CreateFile(path string) (file *os.File, err error) {
 		}
 	}
 
+	//nolint:gosec // path is the user-provided output file path.
 	file, err = os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
 	if err != nil {
 		return
@@ -73,7 +74,9 @@ func (w *Writer) Write(writer io.Writer, result xcrawl3r.Result) (err error) {
 func (w *Writer) writeTXT(writer io.Writer, result xcrawl3r.Result) (err error) {
 	bw := bufio.NewWriter(writer)
 
-	fmt.Fprintln(bw, result.Value)
+	if _, err = fmt.Fprintln(bw, result.Value); err != nil {
+		return
+	}
 
 	if err = bw.Flush(); err != nil {
 		return
@@ -100,7 +103,9 @@ func (w *Writer) writeJSON(writer io.Writer, result xcrawl3r.Result) (err error)
 
 	bw := bufio.NewWriter(writer)
 
-	fmt.Fprintln(bw, dataJSONString)
+	if _, err = fmt.Fprintln(bw, dataJSONString); err != nil {
+		return
+	}
 
 	if err = bw.Flush(); err != nil {
 		return

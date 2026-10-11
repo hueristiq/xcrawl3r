@@ -72,7 +72,7 @@ func (c *Crawler) collector(ctx context.Context, scope *scope) (collector *colly
 		IdleConnTimeout:     c.opts.timeout,
 		TLSHandshakeTimeout: c.opts.timeout,
 		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: true,
+			InsecureSkipVerify: true, //nolint:gosec // default for recon; opt-out flag lands with the request-semantics fixes.
 			Renegotiation:      tls.RenegotiateOnceAsClient,
 		},
 	}
@@ -112,7 +112,9 @@ func (c *Crawler) collector(ctx context.Context, scope *scope) (collector *colly
 		collector.SetDebugger(&debug.LogDebugger{})
 	}
 
-	collector.SetStorage(c.storage)
+	if err = collector.SetStorage(c.storage); err != nil {
+		return
+	}
 
 	return
 }
