@@ -31,11 +31,13 @@ func (w *Writer) CreateFile(path string) (file *os.File, err error) {
 
 	switch w.format {
 	case formatTXT:
-		if extension != ".txt" {
+		if extension == "" {
 			path += ".txt"
 		}
 	case formatJSONL:
-		if extension != ".json" {
+		// .json and .jsonl are accepted as-is; any other extension is kept,
+		// and only an extensionless path gets the default.
+		if extension == "" {
 			path += ".json"
 		}
 	}

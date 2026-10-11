@@ -14,6 +14,8 @@ func TestParseBurpRequest(t *testing.T) {
 		"User-Agent: Mozilla/5.0 Test\r\n" +
 		"Cookie: session=abc123\r\n" +
 		"Authorization: Bearer token\r\n" +
+		"Accept-Encoding: gzip, deflate, br\r\n" +
+		"Connection: keep-alive\r\n" +
 		"Content-Length: 0\r\n" +
 		"\r\n"
 

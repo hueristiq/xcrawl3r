@@ -61,7 +61,10 @@ func ParseBurpRequest(path string) (headers []string, err error) {
 		value = strings.TrimSpace(value)
 
 		switch {
-		case strings.EqualFold(key, "Host"), strings.EqualFold(key, "Content-Length"):
+		case strings.EqualFold(key, "Host"),
+			strings.EqualFold(key, "Content-Length"),
+			strings.EqualFold(key, "Accept-Encoding"),
+			strings.EqualFold(key, "Connection"):
 			continue
 		}
 
