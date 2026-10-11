@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	hqgologger "github.com/hueristiq/hq-lib-logger-go"
@@ -131,7 +132,7 @@ func init() {
 		h += " or specify multiple `--header`.\n\n"
 
 		h += fmt.Sprintf("     --timeout int                time to wait for request in seconds (default: %d)\n", configuration.DefaultConfiguration.Request.Timeout)
-		h += fmt.Sprintf("     --retries int                number of retries for failed requests (default: %d)\n", configuration.DefaultConfiguration.Request.Retries)
+		h += fmt.Sprintf("     --retries int                maximum attempts per request, `0` for no retries (default: %d)\n", configuration.DefaultConfiguration.Request.Retries)
 		h += "     --random-agent bool          use a random User-Agent for each request\n"
 		h += "     --insecure-skip-verify bool  skip TLS certificate verification (default: true)\n"
 		h += "     --requests-per-minute int    maximum requests per minute, per host (default: 0, no limit)\n"
@@ -250,7 +251,7 @@ func init() {
 func main() {
 	hqgologger.Info(configuration.Banner(au), hqgologger.WithLabel(""))
 
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	c := viper.GetInt("optimization.concurrency")
@@ -440,7 +441,7 @@ func main() {
 	for result := range resultsChan {
 		switch result.Type {
 		case xcrawl3r.ResultError:
-			if verbose {
+			if verbose || debug {
 				hqgologger.Error("failed to find results!", hqgologger.WithError(result.Error))
 			}
 		case xcrawl3r.ResultWarning:

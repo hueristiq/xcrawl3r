@@ -113,6 +113,11 @@ func (c *Crawler) registerHandlers(ctx context.Context, collector *colly.Collect
 
 			renderedURLs, err := c.render(ctx, response.Request.URL.String())
 			if err != nil {
+				emit(ctx, results, Result{
+					Type:  ResultError,
+					Error: fmt.Errorf("error rendering %s: %w", response.Request.URL.String(), err),
+				})
+
 				return
 			}
 

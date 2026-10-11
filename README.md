@@ -1,6 +1,6 @@
 # xcrawl3r
 
-![made with go](https://img.shields.io/badge/made%20with-Go-1E90FF.svg) [![go report card](https://goreportcard.com/badge/github.com/hueristiq/xcrawl3r)](https://goreportcard.com/report/github.com/hueristiq/xcrawl3r) [![release](https://img.shields.io/github/release/hueristiq/xcrawl3r?style=flat&color=1E90FF)](https://github.com/hueristiq/xcrawl3r/releases) [![open issues](https://img.shields.io/github/issues-raw/hueristiq/xcrawl3r.svg?style=flat&color=1E90FF)](https://github.com/hueristiq/xcrawl3r/issues?q=is:issue+is:open) [![closed issues](https://img.shields.io/github/issues-closed-raw/hueristiq/xcrawl3r.svg?style=flat&color=1E90FF)](https://github.com/hueristiq/xcrawl3r/issues?q=is:issue+is:closed) [![license](https://img.shields.io/badge/license-MIT-gray.svg?color=1E90FF)](https://github.com/hueristiq/xcrawl3r/blob/master/LICENSE) ![maintenance](https://img.shields.io/badge/maintained%3F-yes-1E90FF.svg) [![contribution](https://img.shields.io/badge/contributions-welcome-1E90FF.svg)](https://github.com/hueristiq/xcrawl3r/blob/master/CONTRIBUTING.md)
+![made with go](https://img.shields.io/badge/made%20with-Go-1E90FF.svg) [![go report card](https://goreportcard.com/badge/github.com/hueristiq/xcrawl3r)](https://goreportcard.com/report/github.com/hueristiq/xcrawl3r) [![release](https://img.shields.io/github/release/hueristiq/xcrawl3r?style=flat&color=1E90FF)](https://github.com/hueristiq/xcrawl3r/releases) [![open issues](https://img.shields.io/github/issues-raw/hueristiq/xcrawl3r.svg?style=flat&color=1E90FF)](https://github.com/hueristiq/xcrawl3r/issues?q=is:issue+is:open) [![closed issues](https://img.shields.io/github/issues-closed-raw/hueristiq/xcrawl3r.svg?style=flat&color=1E90FF)](https://github.com/hueristiq/xcrawl3r/issues?q=is:issue+is:closed) [![license](https://img.shields.io/badge/license-MIT-gray.svg?color=1E90FF)](https://github.com/hueristiq/xcrawl3r/blob/main/LICENSE) ![maintenance](https://img.shields.io/badge/maintained%3F-yes-1E90FF.svg) [![contribution](https://img.shields.io/badge/contributions-welcome-1E90FF.svg)](https://github.com/hueristiq/xcrawl3r/blob/main/CONTRIBUTING.md)
 
 `xcrawl3r` is a command-line utility designed to recursively spider webpages for URLs. It works by actively traversing websites - following links embedded in webpages, and parsing files (including sitemaps & robots.txt) - to uncover every URL.
 
@@ -53,7 +53,7 @@ tar xf xcrawl3r-<version>-linux-amd64.tar.gz
 ```
 
 > [!TIP]
-> The above steps, download and extract, can be combined into a single step with this onliner
+> The above steps, download and extract, can be combined into a single step with this one-liner
 > 
 > ```bash
 > curl -sL https://github.com/hueristiq/xcrawl3r/releases/download/v<version>/xcrawl3r-<version>-linux-amd64.tar.gz | tar -xzv
@@ -147,6 +147,10 @@ xcrawl3r -u https://example.com --headless --headless-timeout 15
 - If no browser is available, `xcrawl3r` logs a warning and continues with static crawling.
 - The Docker image does not ship Chrome — use `--headless` on the host.
 
+## TLS Verification
+
+`xcrawl3r` skips TLS certificate verification by default (`--insecure-skip-verify` defaults to `true`) — many recon targets serve broken or self-signed certificates. Crawling your own infrastructure? Enforce verification with `--insecure-skip-verify=false`.
+
 ## Integration
 
 `xcrawl3r` crawls targets actively; [`xurlfind3r`](https://github.com/hueristiq/xurlfind3r/) discovers URLs passively (archives, search engines, certificate logs). Combine them to get the broadest picture:
@@ -216,8 +220,9 @@ REQUEST:
  or specify multiple `--header`.
 
      --timeout int                time to wait for request in seconds (default: 10)
-     --retries int                number of retries for failed requests (default: 3)
+     --retries int                maximum attempts per request, `0` for no retries (default: 3)
      --random-agent bool          use a random User-Agent for each request
+     --insecure-skip-verify bool  skip TLS certificate verification (default: true)
      --requests-per-minute int    maximum requests per minute, per host (default: 0, no limit)
      --cookie string[]            cookie to include in 'name=value' format
      --burp string                burp request file path, headers & cookies are imported
@@ -254,7 +259,7 @@ OUTPUT:
 
 ## Contributing
 
-Contributions are welcome and encouraged! Feel free to submit [Pull Requests](https://github.com/hueristiq/xcrawl3r/pulls) or report [Issues](https://github.com/hueristiq/xcrawl3r/issues). For more details, check out the [contribution guidelines](https://github.com/hueristiq/xcrawl3r/blob/master/CONTRIBUTING.md).
+Contributions are welcome and encouraged! Feel free to submit [Pull Requests](https://github.com/hueristiq/xcrawl3r/pulls) or report [Issues](https://github.com/hueristiq/xcrawl3r/issues). For more details, check out the [contribution guidelines](https://github.com/hueristiq/xcrawl3r/blob/main/CONTRIBUTING.md).
 
 A big thank you to all the [contributors](https://github.com/hueristiq/xcrawl3r/graphs/contributors) for your ongoing support!
 
@@ -262,4 +267,4 @@ A big thank you to all the [contributors](https://github.com/hueristiq/xcrawl3r/
 
 ## Licensing
 
-This package is licensed under the [MIT license](https://opensource.org/license/mit). You are free to use, modify, and distribute it, as long as you follow the terms of the license. You can find the full license text in the repository - [Full MIT license text](https://github.com/hueristiq/xcrawl3r/blob/master/LICENSE).
+This package is licensed under the [MIT license](https://opensource.org/license/mit). You are free to use, modify, and distribute it, as long as you follow the terms of the license. You can find the full license text in the repository - [Full MIT license text](https://github.com/hueristiq/xcrawl3r/blob/main/LICENSE).

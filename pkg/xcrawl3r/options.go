@@ -92,13 +92,14 @@ func WithTimeout(timeout time.Duration) (f OptionFunc) {
 	}
 }
 
+// WithRetries sets the maximum number of attempts per request, including the
+// initial attempt. Zero or negative values mean a single attempt with no
+// retries.
 func WithRetries(retries int) (f OptionFunc) {
 	return func(opts *options) {
 		switch {
-		case retries < 0:
+		case retries <= 0:
 			opts.retries = 1
-		case retries == 0:
-			opts.retries = defaultRetries
 		default:
 			opts.retries = retries
 		}
