@@ -437,6 +437,8 @@ func main() {
 			if verbose {
 				hqgologger.Error("failed to find results!", hqgologger.WithError(result.Error))
 			}
+		case xcrawl3r.ResultWarning:
+			hqgologger.Warn(result.Value)
 		case xcrawl3r.ResultURL:
 			for _, output := range outputs {
 				if err := writer.Write(output, result); err != nil {

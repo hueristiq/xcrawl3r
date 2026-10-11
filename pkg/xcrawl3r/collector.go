@@ -3,6 +3,7 @@ package xcrawl3r
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
 	"net"
 	"net/http"
 	"strings"
@@ -15,7 +16,7 @@ import (
 	hqgohttpuseragent "github.com/hueristiq/hq-lib-http-go/useragent"
 )
 
-func (c *Crawler) collector(ctx context.Context, scope *scope) (collector *colly.Collector, err error) {
+func (c *Crawler) collector(ctx context.Context, scope *scope, results chan<- Result) (collector *colly.Collector, err error) {
 	collector = colly.NewCollector(
 		colly.Async(true),
 		colly.IgnoreRobotsTxt(),
@@ -84,12 +85,8 @@ func (c *Crawler) collector(ctx context.Context, scope *scope) (collector *colly
 			requestsPerMinute: c.opts.requestsPerMinute,
 		},
 		Timeout: c.opts.timeout,
-		CheckRedirect: func(req *http.Request, _ []*http.Request) (err error) {
-			if !scope.allows(req.URL.String()) {
-				return http.ErrUseLastResponse
-			}
-
-			return
+		CheckRedirect: func(request *http.Request, _ []*http.Request) (err error) {
+			return checkRedirect(ctx, results, scope, request)
 		},
 	}
 
@@ -114,6 +111,34 @@ func (c *Crawler) collector(ctx context.Context, scope *scope) (collector *colly
 
 	if err = collector.SetStorage(c.storage); err != nil {
 		return
+	}
+
+	return
+}
+
+// checkRedirect implements the redirect policy: in-scope targets are followed,
+// targets on the same registrable domain widen the scope (with a warning), and
+// everything else is refused via http.ErrUseLastResponse.
+func checkRedirect(ctx context.Context, results chan<- Result, scope *scope, request *http.Request) (err error) {
+	if scope.allows(request.URL.String()) {
+		return
+	}
+
+	if !scope.registrableAllows(request.URL.String()) {
+		return http.ErrUseLastResponse
+	}
+
+	host := strings.ToLower(request.URL.Hostname())
+
+	if scope.widen(host) {
+		emit(ctx, results, Result{
+			Type: ResultWarning,
+			Value: fmt.Sprintf(
+				"redirect to %s is outside the configured scope; following it and adding %s to the scope",
+				request.URL.String(),
+				host,
+			),
+		})
 	}
 
 	return

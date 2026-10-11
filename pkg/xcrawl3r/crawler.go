@@ -93,7 +93,7 @@ func (c *Crawler) crawl(ctx context.Context, target string, results chan Result)
 
 	scope := c.scopeFor(parsedTargetURL)
 
-	collector, err := c.collector(ctx, scope)
+	collector, err := c.collector(ctx, scope, results)
 	if err != nil {
 		emit(ctx, results, Result{
 			Type:  ResultError,

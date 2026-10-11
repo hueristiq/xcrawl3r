@@ -13,4 +13,5 @@ type ResultType int
 const (
 	ResultURL ResultType = iota
 	ResultError
+	ResultWarning
 )
