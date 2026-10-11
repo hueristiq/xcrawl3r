@@ -66,11 +66,24 @@ func (c *Crawler) registerHandlers(ctx context.Context, collector *colly.Collect
 			"*", "",
 			`\u002f`, "/",
 			`\u0026`, "&",
+			`\u003c`, "<",
+			`\u003C`, "<",
+			`\u003e`, ">",
+			`\u003E`, ">",
 		)
 
 		body := replacer.Replace(string(response.Body))
 
-		for _, link := range c.urlExtractorRegex.FindAllString(body, -1) {
+		for _, loc := range c.urlExtractorRegex.FindAllStringIndex(body, -1) {
+			link := body[loc[0]:loc[1]]
+
+			// A relative match starting right after '<' is the tail of an
+			// HTML/XML tag ("/div" in "</div>", "/loc" in "</loc>"), not a
+			// URL.
+			if loc[0] > 0 && body[loc[0]-1] == '<' && !strings.Contains(link, "://") {
+				continue
+			}
+
 			// On HTML pages only absolute links are extracted (e.g. from inline
 			// scripts); relative ones are covered by the OnHTML attribute handlers
 			// and would otherwise match tag fragments like "</script>".

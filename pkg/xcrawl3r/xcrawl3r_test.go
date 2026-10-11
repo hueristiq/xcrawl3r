@@ -138,6 +138,12 @@ func TestCrawl(t *testing.T) {
 		}
 	}
 
+	for _, junk := range []string{"/loc", "/url", "/urlset"} {
+		if got[server.URL+junk] > 0 {
+			t.Errorf("%s emitted from closing XML tags, want it suppressed", server.URL+junk)
+		}
+	}
+
 	for URL, count := range got {
 		if count > 1 {
 			t.Errorf("%s emitted %d times, want 1", URL, count)
@@ -193,6 +199,65 @@ func TestCrawl(t *testing.T) {
 
 		if !strings.HasSuffix(result.Source, check.sourceSuffix) {
 			t.Errorf("%s source = %q, want suffix %q", check.path, result.Source, check.sourceSuffix)
+		}
+	}
+}
+
+func TestCrawlJavaScriptTagJunkSuppressed(t *testing.T) {
+	t.Parallel()
+
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+
+		_, _ = fmt.Fprint(w, `<html><body><script src="/app.js"></script></body></html>`)
+	})
+
+	mux.HandleFunc("/robots.txt", func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = fmt.Fprint(w, "User-agent: *\n")
+	})
+
+	mux.HandleFunc("/app.js", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/javascript")
+
+		_, _ = fmt.Fprint(w, `const el = document.getElementById("x");`+
+			`el.innerHTML = "</div><span>hi</span>";`+
+			`const escaped = "\u003c/div\u003e";`+
+			`const api = "/api/v1/users";`)
+	})
+
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	crawler, err := xcrawl3r.New(
+		xcrawl3r.WithDepth(2),
+		xcrawl3r.WithParallelism(4),
+		xcrawl3r.WithTimeout(10*time.Second),
+	)
+	if err != nil {
+		t.Fatalf("xcrawl3r.New() error = %v", err)
+	}
+
+	got := make(map[string]bool)
+
+	for result := range crawler.Crawl(t.Context(), server.URL) {
+		if result.Type == xcrawl3r.ResultError {
+			t.Errorf("unexpected error result: %v", result.Error)
+
+			continue
+		}
+
+		got[result.Value] = true
+	}
+
+	if !got[server.URL+"/api/v1/users"] {
+		t.Errorf("expected relative URL %s/api/v1/users to be emitted", server.URL)
+	}
+
+	for _, junk := range []string{"/div", "/span"} {
+		if got[server.URL+junk] {
+			t.Errorf("%s emitted from closing HTML tags, want it suppressed", server.URL+junk)
 		}
 	}
 }
