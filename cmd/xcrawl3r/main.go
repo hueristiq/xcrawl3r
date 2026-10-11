@@ -252,6 +252,11 @@ func main() {
 	defer stop()
 
 	c := viper.GetInt("optimization.concurrency")
+	if c < 1 {
+		// Zero or negative concurrency would start no workers (or panic on
+		// make); clamp to a single worker.
+		c = 1
+	}
 
 	urlsChan := make(chan string, c)
 

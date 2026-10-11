@@ -174,12 +174,21 @@ func (c *Crawler) processLink(ctx context.Context, request *colly.Request, link,
 
 func (c *Crawler) visit(ctx context.Context, URL string, results chan<- Result, scope *scope, do func() error) {
 	if scope.maxPages > 0 {
-		if scope.requestCount.Add(1) > uint32(scope.maxPages) { //nolint:gosec // guarded by maxPages > 0; validated non-negative at option time.
+		if scope.requestCount.Add(1) > uint32(scope.maxPages) { //nolint:gosec // maxPages validated >= 0 in New(); the > 0 guard here covers the rest.
 			return
 		}
 	}
 
-	if err := do(); err != nil && !isExpectedVisitError(err) {
+	err := do()
+	if err == nil {
+		return
+	}
+
+	// Unsuccessful visits (already-visited, depth-exceeded, transport
+	// failures) do not consume the page budget.
+	scope.requestCount.Add(^uint32(0))
+
+	if !isExpectedVisitError(err) {
 		emit(ctx, results, Result{
 			Type:  ResultError,
 			Error: fmt.Errorf("error visiting %s: %w", URL, err),

@@ -1,6 +1,9 @@
 package xcrawl3r
 
-import "time"
+import (
+	"errors"
+	"time"
+)
 
 type OptionFunc func(*options)
 
@@ -40,6 +43,21 @@ func defaultOptions() (opts *options) {
 		depth:       defaultDepth,
 		parallelism: defaultParallelism,
 	}
+}
+
+func (opts *options) validate() (err error) {
+	switch {
+	case opts.timeout <= 0:
+		return errors.New("timeout must be greater than 0")
+	case opts.parallelism < 1:
+		return errors.New("parallelism must be at least 1")
+	case opts.depth < 0:
+		return errors.New("depth must be 0 or greater")
+	case opts.maxPages < 0:
+		return errors.New("max pages must be 0 or greater")
+	}
+
+	return
 }
 
 func WithDomains(domains []string) (f OptionFunc) {

@@ -262,6 +262,32 @@ func TestCrawlJavaScriptTagJunkSuppressed(t *testing.T) {
 	}
 }
 
+func TestNewValidatesOptions(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		opt  xcrawl3r.OptionFunc
+	}{
+		{"zero timeout", xcrawl3r.WithTimeout(0)},
+		{"negative timeout", xcrawl3r.WithTimeout(-time.Second)},
+		{"zero parallelism", xcrawl3r.WithParallelism(0)},
+		{"negative parallelism", xcrawl3r.WithParallelism(-1)},
+		{"negative depth", xcrawl3r.WithDepth(-1)},
+		{"negative max pages", xcrawl3r.WithMaxPages(-1)},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			if _, err := xcrawl3r.New(tt.opt); err == nil {
+				t.Error("New() expected error, got nil")
+			}
+		})
+	}
+}
+
 func TestCrawlDeduplicatesAcrossTargets(t *testing.T) {
 	t.Parallel()
 

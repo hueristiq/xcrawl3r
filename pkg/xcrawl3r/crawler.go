@@ -35,6 +35,10 @@ func New(ofs ...OptionFunc) (crawler *Crawler, err error) {
 		f(crawler.opts)
 	}
 
+	if err = crawler.opts.validate(); err != nil {
+		return
+	}
+
 	crawler.urlExtractorRegex, err = hqgourlextractor.New().CompileRegex()
 	if err != nil {
 		return
