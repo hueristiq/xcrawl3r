@@ -45,6 +45,10 @@ func New(ofs ...OptionFunc) (crawler *Crawler, err error) {
 
 	crawler.storage = &storage.InMemoryStorage{}
 
+	if err = crawler.storage.Init(); err != nil {
+		return
+	}
+
 	if crawler.opts.headless {
 		timeout := crawler.opts.headlessTimeout
 		if timeout <= 0 {

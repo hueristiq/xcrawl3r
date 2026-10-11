@@ -101,3 +101,40 @@ func TestCrawlHeadless(t *testing.T) {
 		t.Error("expected /js-page to be requested")
 	}
 }
+
+func TestHeadlessStartCloseStart(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping headless test in short mode")
+	}
+
+	if !headlessAvailable() {
+		t.Skip("no Chrome/Chromium binary found")
+	}
+
+	t.Parallel()
+
+	crawler, err := xcrawl3r.New(
+		xcrawl3r.WithHeadless(true),
+		xcrawl3r.WithHeadlessTimeout(10*time.Second),
+	)
+	if err != nil {
+		t.Fatalf("xcrawl3r.New() error = %v", err)
+	}
+
+	// Closing before starting must not poison later starts (the old sync.Once
+	// abuse made start() a no-op after close()).
+	crawler.Close()
+
+	if err := crawler.Validate(); err != nil {
+		t.Fatalf("Validate() error = %v", err)
+	}
+
+	crawler.Close()
+
+	// Restarting after a clean close must bring the browser back.
+	if err := crawler.Validate(); err != nil {
+		t.Fatalf("Validate() after close error = %v", err)
+	}
+
+	crawler.Close()
+}

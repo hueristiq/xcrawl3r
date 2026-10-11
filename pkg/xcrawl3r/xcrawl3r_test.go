@@ -225,6 +225,72 @@ func TestCrawlDeduplicatesAcrossTargets(t *testing.T) {
 	}
 }
 
+func TestCrawlConcurrentTargets(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/robots.txt" {
+			_, _ = fmt.Fprint(w, "User-agent: *\n")
+
+			return
+		}
+
+		w.Header().Set("Content-Type", "text/html")
+
+		if r.URL.Path == "/" {
+			_, _ = fmt.Fprint(w, `<html><body><a href="/page">p</a></body></html>`)
+
+			return
+		}
+
+		_, _ = fmt.Fprint(w, `<html><body></body></html>`)
+	}))
+	defer server.Close()
+
+	crawler, err := xcrawl3r.New(
+		xcrawl3r.WithDepth(1),
+		xcrawl3r.WithParallelism(4),
+		xcrawl3r.WithTimeout(10*time.Second),
+	)
+	if err != nil {
+		t.Fatalf("xcrawl3r.New() error = %v", err)
+	}
+
+	// The shared colly storage and seen-set must be safe for concurrent
+	// Crawl calls; this exercises the lazy-Init data race fixed in New().
+	const workers = 5
+
+	var emitted sync.Map
+
+	wg := &sync.WaitGroup{}
+
+	for range workers {
+		wg.Add(1)
+
+		go func() {
+			defer wg.Done()
+
+			for result := range crawler.Crawl(t.Context(), server.URL) {
+				if result.Type == xcrawl3r.ResultError {
+					t.Errorf("unexpected error result: %v", result.Error)
+
+					continue
+				}
+
+				if _, duplicate := emitted.LoadOrStore(result.Value, struct{}{}); duplicate {
+					t.Errorf("duplicate result across concurrent crawls: %s", result.Value)
+				}
+			}
+		}()
+	}
+
+	wg.Wait()
+
+	if _, ok := emitted.Load(server.URL + "/page"); !ok {
+		t.Errorf("expected %s/page to be emitted", server.URL)
+	}
+}
+
 func TestCrawlMaxPages(t *testing.T) {
 	t.Parallel()
 

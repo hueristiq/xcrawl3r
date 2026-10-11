@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/chromedp/chromedp"
@@ -32,41 +33,63 @@ const headlessLinksJS = `(() => {
 type headless struct {
 	timeout time.Duration
 
-	once    sync.Once
-	browser context.Context //nolint:containedctx // browser lifecycle handle, not a request scope.
-	cancel  context.CancelFunc
-	err     error
+	mu          sync.Mutex
+	browser     context.Context //nolint:containedctx // browser lifecycle handle, not a request scope.
+	cancel      context.CancelFunc
+	cancelAlloc context.CancelFunc
+	started     atomic.Bool
+	err         error
 }
 
 func (h *headless) start() (err error) {
-	h.once.Do(func() {
-		var allocCtx context.Context
+	h.mu.Lock()
+	defer h.mu.Unlock()
 
-		var cancelAlloc context.CancelFunc
+	if h.started.Load() {
+		return h.err
+	}
 
-		allocCtx, cancelAlloc = chromedp.NewExecAllocator(context.Background(), chromedp.DefaultExecAllocatorOptions[:]...)
+	allocCtx, cancelAlloc := chromedp.NewExecAllocator(context.Background(), chromedp.DefaultExecAllocatorOptions[:]...)
 
-		h.browser, h.cancel = chromedp.NewContext(allocCtx)
+	h.browser, h.cancel = chromedp.NewContext(allocCtx)
 
-		h.err = chromedp.Do(h.browser, chromedp.Evaluate[chromedp.Void]("1"))
-		if h.err != nil {
-			h.cancel()
-			cancelAlloc()
+	h.err = chromedp.Do(h.browser, chromedp.Evaluate[chromedp.Void]("1"))
+	if h.err != nil {
+		h.cancel()
+		cancelAlloc()
 
-			h.browser = nil
-			h.cancel = nil
-		}
-	})
+		h.browser = nil
+		h.cancel = nil
 
-	return h.err
+		return
+	}
+
+	h.cancelAlloc = cancelAlloc
+	h.started.Store(true)
+
+	return
 }
 
 func (h *headless) close() {
-	h.once.Do(func() {})
-
-	if h.cancel != nil {
-		h.cancel()
+	if !h.started.Load() {
+		return
 	}
+
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	if !h.started.Load() {
+		return
+	}
+
+	h.cancel()
+	h.cancelAlloc()
+
+	h.browser = nil
+	h.cancel = nil
+	h.cancelAlloc = nil
+	h.err = nil
+	h.started.Store(false)
 }
 
 // Validate starts the headless browser early when headless mode is enabled, so
