@@ -68,9 +68,6 @@ func (s *scope) allows(rawURL string) (allowed bool) {
 	return
 }
 
-// registrableAllows reports whether rawURL's host shares a registrable domain
-// (public suffix + one label, e.g. example.co.uk) with one of the scoped
-// domains, even when the host itself is out of scope.
 func (s *scope) registrableAllows(rawURL string) (allowed bool) {
 	parsedURL, err := up.Parse(rawURL)
 	if err != nil {
@@ -99,8 +96,6 @@ func (s *scope) registrableAllows(rawURL string) (allowed bool) {
 	return
 }
 
-// widen adds host to the scoped domains when it is not already covered,
-// e.g. when a redirect moved the crawl from example.com to www.example.com.
 func (s *scope) widen(host string) (widened bool) {
 	host = strings.ToLower(host)
 

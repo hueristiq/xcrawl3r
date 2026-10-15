@@ -205,9 +205,6 @@ OPTIMIZATION:
      --ignore-query bool          deduplicate URLs ignoring the query string
      --shape-dedup bool           deduplicate URLs by shape (numbers, UUIDs, dates normalized)
 
-DEBUG:
-     --debug bool                 enable debug mode
-
 HEADLESS:
      --headless bool              render pages in a headless browser, requires Chrome/Chromium
      --headless-timeout int       time to wait for page rendering in seconds (default: 10)
@@ -215,6 +212,7 @@ HEADLESS:
 OUTPUT:
      --jsonl bool                 output in JSONL(ines)
  -o, --output string              output write file path
+ -O, --output-directory string    output write directory path
  -m, --monochrome bool            disable colored console output
  -s, --silent bool                disable logging output, only results
  -v, --verbose bool               enable detailed debug logging output

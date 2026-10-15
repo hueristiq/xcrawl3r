@@ -27,7 +27,6 @@ type options struct {
 	crawlDuration      time.Duration
 	headless           bool
 	headlessTimeout    time.Duration
-	debug              bool
 }
 
 const (
@@ -92,9 +91,6 @@ func WithTimeout(timeout time.Duration) (f OptionFunc) {
 	}
 }
 
-// WithRetries sets the maximum number of attempts per request, including the
-// initial attempt. Zero or negative values mean a single attempt with no
-// retries.
 func WithRetries(retries int) (f OptionFunc) {
 	return func(opts *options) {
 		switch {
@@ -130,10 +126,6 @@ func WithRandomUserAgent(randomUserAgent bool) (f OptionFunc) {
 	}
 }
 
-// WithInsecureSkipVerify controls TLS certificate verification. It defaults to
-// true: crawling with an invalid certificate still works, which is the common
-// recon case. Set it to false to enforce verification against targets the
-// operator controls.
 func WithInsecureSkipVerify(insecureSkipVerify bool) (f OptionFunc) {
 	return func(opts *options) {
 		opts.insecureSkipVerify = insecureSkipVerify
@@ -185,11 +177,5 @@ func WithDepth(depth int) (f OptionFunc) {
 func WithParallelism(parallelism int) (f OptionFunc) {
 	return func(opts *options) {
 		opts.parallelism = parallelism
-	}
-}
-
-func WithDebug(debug bool) (f OptionFunc) {
-	return func(opts *options) {
-		opts.debug = debug
 	}
 }

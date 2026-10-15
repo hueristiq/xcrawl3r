@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/gocolly/colly/v2"
-	"github.com/gocolly/colly/v2/debug"
 	"github.com/gocolly/colly/v2/extensions"
 	"github.com/gocolly/colly/v2/proxy"
 	hqgohttpheader "github.com/hueristiq/hq-lib-http-go/header"
@@ -105,10 +104,6 @@ func (c *Crawler) collector(ctx context.Context, scope *scope, results chan<- Re
 		collector.SetProxyFunc(rrps)
 	}
 
-	if c.opts.debug {
-		collector.SetDebugger(&debug.LogDebugger{})
-	}
-
 	if err = collector.SetStorage(c.storage); err != nil {
 		return
 	}
@@ -116,9 +111,6 @@ func (c *Crawler) collector(ctx context.Context, scope *scope, results chan<- Re
 	return
 }
 
-// checkRedirect implements the redirect policy: in-scope targets are followed,
-// targets on the same registrable domain widen the scope (with a warning), and
-// everything else is refused via http.ErrUseLastResponse.
 func checkRedirect(ctx context.Context, results chan<- Result, scope *scope, request *http.Request) (err error) {
 	if scope.allows(request.URL.String()) {
 		return

@@ -247,8 +247,6 @@ func isExpectedVisitError(err error) (expected bool) {
 	return
 }
 
-// isNonGzippedXMLGZProbe reports whether err is the expected outcome of
-// requesting a *.xml.gz URL from a server that does not serve gzip there.
 func isNonGzippedXMLGZProbe(rawURL string, err error) (expected bool) {
 	if !strings.HasSuffix(strings.ToLower(rawURL), ".xml.gz") {
 		return

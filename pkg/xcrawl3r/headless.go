@@ -12,10 +12,6 @@ import (
 
 const defaultHeadlessTimeout = 10 * time.Second
 
-// headlessLinksJS collects the absolute URLs of every element carrying an href
-// or src attribute from the rendered DOM. e.href/e.src resolve relative URLs
-// against document.baseURI, so links injected by client-side routing are
-// captured.
 const headlessLinksJS = `(() => {
 	const links = new Set();
 
@@ -92,9 +88,6 @@ func (h *headless) close() {
 	h.started.Store(false)
 }
 
-// Validate starts the headless browser early when headless mode is enabled, so
-// a missing Chrome/Chromium installation surfaces immediately instead of
-// silently degrading every render.
 func (c *Crawler) Validate() (err error) {
 	if c.headless == nil {
 		return
@@ -105,17 +98,12 @@ func (c *Crawler) Validate() (err error) {
 	return
 }
 
-// Close shuts the headless browser down. It must be called when the crawler is
-// no longer needed and headless mode was enabled.
 func (c *Crawler) Close() {
 	if c.headless != nil {
 		c.headless.close()
 	}
 }
 
-// render loads rawURL in a headless browser tab and returns the absolute URLs
-// found in the rendered DOM: attribute links plus absolute URLs matched by the
-// extractor regex in the rendered HTML.
 func (c *Crawler) render(ctx context.Context, rawURL string) (urls []string, err error) {
 	if err = c.headless.start(); err != nil {
 		return

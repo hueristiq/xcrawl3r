@@ -89,9 +89,6 @@ func (rt *roundTripper) RoundTrip(req *http.Request) (response *http.Response, e
 	return
 }
 
-// isTransientError reports whether err is worth retrying: retryable HTTP
-// statuses, unexpected EOFs, and network timeouts. Permanent failures (DNS
-// resolution, TLS handshakes, connection refusals) retry nothing.
 func isTransientError(err error) (transient bool) {
 	var statusError *retryableStatusError
 	if errors.As(err, &statusError) {
@@ -107,8 +104,6 @@ func isTransientError(err error) (transient bool) {
 	return errors.As(err, &netErr) && netErr.Timeout()
 }
 
-// waitRetryAfter sleeps for the delay requested by the server's Retry-After
-// header (delta-seconds or HTTP-date), or until ctx is done.
 func waitRetryAfter(ctx context.Context, header http.Header) (err error) {
 	raw := header.Get("Retry-After")
 

@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"sync"
 	"syscall"
@@ -15,6 +16,7 @@ import (
 	hqgologger "github.com/hueristiq/hq-lib-logger-go"
 	hqgologgerformatter "github.com/hueristiq/hq-lib-logger-go/formatter"
 	hqgologgerlevels "github.com/hueristiq/hq-lib-logger-go/levels"
+	hqgourlparser "github.com/hueristiq/hq-lib-url-go/parser"
 	"github.com/logrusorgru/aurora/v4"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -50,15 +52,31 @@ var (
 	shapeDedup            bool
 	headless              bool
 	headlessTimeout       int
-	debug                 bool
 	outputInJSONL         bool
 	outputFilePath        string
+	outputDirectoryPath   string
 	monochrome            bool
 	silent                bool
 	verbose               bool
 
 	au = aurora.New(aurora.WithColors(true))
 )
+
+var parser = hqgourlparser.New(hqgourlparser.WithDefaultScheme("https"))
+
+type crawledResult struct {
+	domain string
+	result xcrawl3r.Result
+}
+
+func rootDomain(rawURL string) (domain string) {
+	parsed, err := parser.Parse(rawURL)
+	if err != nil {
+		return
+	}
+
+	return parsed.Key("apex")
+}
 
 func init() {
 	pflag.StringVarP(&configurationFilePath, "configuration", "c", configuration.DefaultConfigurationFilePath(), "")
@@ -85,9 +103,9 @@ func init() {
 	pflag.BoolVar(&shapeDedup, "shape-dedup", configuration.DefaultConfiguration.Optimization.ShapeDedup, "")
 	pflag.BoolVar(&headless, "headless", configuration.DefaultConfiguration.Headless.Enabled, "")
 	pflag.IntVar(&headlessTimeout, "headless-timeout", configuration.DefaultConfiguration.Headless.Timeout, "")
-	pflag.BoolVar(&debug, "debug", false, "")
 	pflag.BoolVar(&outputInJSONL, "jsonl", false, "")
 	pflag.StringVarP(&outputFilePath, "output", "o", "", "")
+	pflag.StringVarP(&outputDirectoryPath, "output-directory", "O", "", "")
 	pflag.BoolVarP(&monochrome, "monochrome", "m", false, "")
 	pflag.BoolVar(&silent, "silent", false, "")
 	pflag.BoolVarP(&verbose, "verbose", "v", false, "")
@@ -155,9 +173,6 @@ func init() {
 		h += "     --ignore-query bool          deduplicate URLs ignoring the query string\n"
 		h += "     --shape-dedup bool           deduplicate URLs by shape (numbers, UUIDs, dates normalized)\n"
 
-		h += "\nDEBUG:\n"
-		h += "     --debug bool                 enable debug mode\n"
-
 		h += "\nHEADLESS:\n"
 		h += "     --headless bool              render pages in a headless browser, requires Chrome/Chromium\n"
 		h += "     --headless-timeout int       time to wait for page rendering in seconds (default: 10)\n"
@@ -165,6 +180,7 @@ func init() {
 		h += "\nOUTPUT:\n"
 		h += "     --jsonl bool                 output in JSONL(ines)\n"
 		h += " -o, --output string              output write file path\n"
+		h += " -O, --output-directory string    output write directory path\n"
 		h += " -m, --monochrome bool            disable colored console output\n"
 		h += " -s, --silent bool                disable logging output, only results\n"
 		h += " -v, --verbose bool               enable detailed debug logging output\n"
@@ -414,7 +430,6 @@ func main() {
 		xcrawl3r.WithShapeDedup(viper.GetBool("optimization.shape_dedup")),
 		xcrawl3r.WithHeadless(viper.GetBool("headless.enabled")),
 		xcrawl3r.WithHeadlessTimeout(time.Duration(viper.GetInt("headless.timeout"))*time.Second),
-		xcrawl3r.WithDebug(debug),
 	)
 	if err != nil {
 		hqgologger.Fatal("failed creating crawler!", hqgologger.WithError(err))
@@ -428,7 +443,7 @@ func main() {
 		}
 	}
 
-	resultsChan := make(chan xcrawl3r.Result)
+	resultsChan := make(chan crawledResult)
 
 	wg := &sync.WaitGroup{}
 
@@ -439,9 +454,14 @@ func main() {
 			defer wg.Done()
 
 			for URL := range urlsChan {
+				domain := rootDomain(URL)
+
 				for result := range crawler.Crawl(ctx, URL) {
 					select {
-					case resultsChan <- result:
+					case resultsChan <- crawledResult{
+						domain: domain,
+						result: result,
+					}:
 					case <-ctx.Done():
 						return
 					}
@@ -455,10 +475,30 @@ func main() {
 		close(resultsChan)
 	}()
 
-	for result := range resultsChan {
+	domainFiles := make(map[string]*os.File)
+
+	domainFile := func(domain string) (file *os.File, err error) {
+		file, ok := domainFiles[domain]
+		if ok {
+			return file, nil
+		}
+
+		file, err = writer.CreateFile(filepath.Join(outputDirectoryPath, domain))
+		if err != nil {
+			return nil, fmt.Errorf("creating output file for %s: %w", domain, err)
+		}
+
+		domainFiles[domain] = file
+
+		return file, nil
+	}
+
+	for crawled := range resultsChan {
+		result := crawled.result
+
 		switch result.Type {
 		case xcrawl3r.ResultError:
-			if verbose || debug {
+			if verbose {
 				hqgologger.Error("failed to find results!", hqgologger.WithError(result.Error))
 			}
 		case xcrawl3r.ResultWarning:
@@ -470,12 +510,31 @@ func main() {
 				}
 			}
 
+			if outputFilePath == "" && outputDirectoryPath != "" && crawled.domain != "" {
+				file, err := domainFile(crawled.domain)
+				if err != nil {
+					hqgologger.Fatal("failed to create output file!", hqgologger.WithString("file", filepath.Join(outputDirectoryPath, crawled.domain)), hqgologger.WithError(err))
+				}
+
+				if err := writer.Write(file, result); err != nil {
+					hqgologger.Error("failed to write result!", hqgologger.WithError(err))
+				}
+
+				if err := writer.Flush(file); err != nil {
+					hqgologger.Error("failed to flush result!", hqgologger.WithError(err))
+				}
+			}
+
 			for _, output := range outputs {
 				if err := writer.Flush(output); err != nil {
 					hqgologger.Error("failed to flush result!", hqgologger.WithError(err))
 				}
 			}
 		}
+	}
+
+	for _, file := range domainFiles {
+		_ = file.Close()
 	}
 
 	hqgologger.Print("", hqgologger.WithoutTimestamp(), hqgologger.WithoutLabel())
