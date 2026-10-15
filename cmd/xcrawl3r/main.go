@@ -35,7 +35,6 @@ var (
 	randomDelay           int
 	headers               []string
 	cookies               []string
-	burpFilePath          string
 	timeout               int
 	retries               int
 	requestsPerMinute     int
@@ -62,7 +61,7 @@ var (
 )
 
 func init() {
-	pflag.StringVarP(&configurationFilePath, "configuration", "c", configuration.DefaultConfigurationFilePath, "")
+	pflag.StringVarP(&configurationFilePath, "configuration", "c", configuration.DefaultConfigurationFilePath(), "")
 	pflag.StringSliceVarP(&urls, "url", "u", []string{}, "")
 	pflag.StringVarP(&urlsListFilePath, "list", "l", "", "")
 	pflag.StringSliceVarP(&domains, "domain", "d", []string{}, "")
@@ -71,22 +70,21 @@ func init() {
 	pflag.IntVar(&randomDelay, "random-delay", configuration.DefaultConfiguration.Request.RandomDelay, "")
 	pflag.StringSliceVarP(&headers, "header", "H", []string{}, "")
 	pflag.StringSliceVar(&cookies, "cookie", []string{}, "")
-	pflag.StringVar(&burpFilePath, "burp", "", "")
 	pflag.IntVar(&timeout, "timeout", configuration.DefaultConfiguration.Request.Timeout, "")
 	pflag.IntVar(&retries, "retries", configuration.DefaultConfiguration.Request.Retries, "")
 	pflag.IntVar(&requestsPerMinute, "requests-per-minute", configuration.DefaultConfiguration.Request.RequestsPerMinute, "")
-	pflag.BoolVar(&randomAgent, "random-agent", false, "")
-	pflag.BoolVar(&insecureSkipVerify, "insecure-skip-verify", true, "skip TLS certificate verification")
-	pflag.StringSliceVarP(&proxies, "proxy", "p", []string{}, "")
+	pflag.BoolVar(&randomAgent, "random-agent", configuration.DefaultConfiguration.Request.RandomAgent, "")
+	pflag.BoolVar(&insecureSkipVerify, "insecure-skip-verify", configuration.DefaultConfiguration.Request.InsecureSkipVerify, "skip TLS certificate verification")
+	pflag.StringSliceVar(&proxies, "proxy", []string{}, "")
 	pflag.IntVar(&depth, "depth", configuration.DefaultConfiguration.Optimization.Depth, "")
 	pflag.IntVarP(&concurrency, "concurrency", "C", configuration.DefaultConfiguration.Optimization.Concurrency, "")
 	pflag.IntVarP(&parallelism, "parallelism", "P", configuration.DefaultConfiguration.Optimization.Parallelism, "")
 	pflag.IntVar(&maxPages, "max-pages", configuration.DefaultConfiguration.Optimization.MaxPages, "")
 	pflag.StringVar(&crawlDuration, "crawl-duration", configuration.DefaultConfiguration.Optimization.CrawlDuration, "")
-	pflag.BoolVar(&ignoreQuery, "ignore-query", false, "")
-	pflag.BoolVar(&shapeDedup, "shape-dedup", false, "")
-	pflag.BoolVar(&headless, "headless", false, "")
-	pflag.IntVar(&headlessTimeout, "headless-timeout", 10, "")
+	pflag.BoolVar(&ignoreQuery, "ignore-query", configuration.DefaultConfiguration.Optimization.IgnoreQuery, "")
+	pflag.BoolVar(&shapeDedup, "shape-dedup", configuration.DefaultConfiguration.Optimization.ShapeDedup, "")
+	pflag.BoolVar(&headless, "headless", configuration.DefaultConfiguration.Headless.Enabled, "")
+	pflag.IntVar(&headlessTimeout, "headless-timeout", configuration.DefaultConfiguration.Headless.Timeout, "")
 	pflag.BoolVar(&debug, "debug", false, "")
 	pflag.BoolVar(&outputInJSONL, "jsonl", false, "")
 	pflag.StringVarP(&outputFilePath, "output", "o", "", "")
@@ -102,7 +100,11 @@ func init() {
 
 		h += "\nCONFIGURATION:\n"
 
-		defaultConfigurationFilePath := strings.ReplaceAll(configuration.DefaultConfigurationFilePath, configuration.UserDotConfigDirectoryPath, "$HOME/.config")
+		defaultConfigurationFilePath := configuration.DefaultConfigurationFilePath()
+
+		if userConfigDirectoryPath, err := configuration.UserConfigDirectoryPath(); err == nil {
+			defaultConfigurationFilePath = strings.ReplaceAll(defaultConfigurationFilePath, userConfigDirectoryPath, "$HOME/.config")
+		}
 
 		h += fmt.Sprintf(" -c, --configuration string       (default: %v)\n", au.Underline(defaultConfigurationFilePath).Bold())
 
@@ -137,10 +139,9 @@ func init() {
 		h += "     --insecure-skip-verify bool  skip TLS certificate verification (default: true)\n"
 		h += "     --requests-per-minute int    maximum requests per minute, per host (default: 0, no limit)\n"
 		h += "     --cookie string[]            cookie to include in 'name=value' format\n"
-		h += "     --burp string                burp request file path, headers & cookies are imported\n"
 
 		h += "\nPROXY:\n"
-		h += " -p, --proxy string[]             Proxy (e.g: http://127.0.0.1:8080)\n"
+		h += "     --proxy string[]             Proxy (e.g: http://127.0.0.1:8080)\n"
 
 		h += "\n For multiple proxies use comma(,) separated value with `--proxy`\n"
 		h += " or specify multiple `--proxy`.\n"
@@ -229,6 +230,30 @@ func init() {
 		hqgologger.Fatal("failed binding flag!", hqgologger.WithString("flag", "crawl-duration"), hqgologger.WithError(err))
 	}
 
+	if err := viper.BindPFlag("request.random_agent", pflag.Lookup("random-agent")); err != nil {
+		hqgologger.Fatal("failed binding flag!", hqgologger.WithString("flag", "random-agent"), hqgologger.WithError(err))
+	}
+
+	if err := viper.BindPFlag("request.insecure_skip_verify", pflag.Lookup("insecure-skip-verify")); err != nil {
+		hqgologger.Fatal("failed binding flag!", hqgologger.WithString("flag", "insecure-skip-verify"), hqgologger.WithError(err))
+	}
+
+	if err := viper.BindPFlag("optimization.ignore_query", pflag.Lookup("ignore-query")); err != nil {
+		hqgologger.Fatal("failed binding flag!", hqgologger.WithString("flag", "ignore-query"), hqgologger.WithError(err))
+	}
+
+	if err := viper.BindPFlag("optimization.shape_dedup", pflag.Lookup("shape-dedup")); err != nil {
+		hqgologger.Fatal("failed binding flag!", hqgologger.WithString("flag", "shape-dedup"), hqgologger.WithError(err))
+	}
+
+	if err := viper.BindPFlag("headless.enabled", pflag.Lookup("headless")); err != nil {
+		hqgologger.Fatal("failed binding flag!", hqgologger.WithString("flag", "headless"), hqgologger.WithError(err))
+	}
+
+	if err := viper.BindPFlag("headless.timeout", pflag.Lookup("headless-timeout")); err != nil {
+		hqgologger.Fatal("failed binding flag!", hqgologger.WithString("flag", "headless-timeout"), hqgologger.WithError(err))
+	}
+
 	hqgologger.DefaultLogger.SetFormatter(hqgologgerformatter.NewConsoleFormatter(&hqgologgerformatter.ConsoleFormatterConfiguration{
 		Colorize: !monochrome,
 	}))
@@ -249,15 +274,16 @@ func init() {
 }
 
 func main() {
-	hqgologger.Info(configuration.Banner(au), hqgologger.WithLabel(""))
+	hqgologger.Info(configuration.Banner(au), hqgologger.WithoutLabel())
+
+	signal.Ignore(syscall.SIGPIPE)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+
 	defer stop()
 
 	c := viper.GetInt("optimization.concurrency")
 	if c < 1 {
-		// Zero or negative concurrency would start no workers (or panic on
-		// make); clamp to a single worker.
 		c = 1
 	}
 
@@ -333,7 +359,7 @@ func main() {
 	if outputFilePath != "" {
 		file, err := writer.CreateFile(outputFilePath)
 		if err != nil {
-			hqgologger.Fatal("failed creating output file!", hqgologger.WithString("file", outputFilePath), hqgologger.WithError(err))
+			hqgologger.Fatal("failed to create output file!", hqgologger.WithString("file", outputFilePath), hqgologger.WithError(err))
 		}
 
 		defer func() {
@@ -345,23 +371,14 @@ func main() {
 
 	h := viper.GetStringSlice("request.headers")
 
-	if !randomAgent {
+	if !viper.GetBool("request.random_agent") {
 		h = configuration.WithDefaultUserAgent(h)
 	}
 
-	if burpFilePath != "" {
-		var burpHeaders []string
+	allCookies := append(viper.GetStringSlice("request.cookies"), cookies...)
 
-		burpHeaders, err := input.ParseBurpRequest(burpFilePath)
-		if err != nil {
-			hqgologger.Fatal("failed parsing burp request file!", hqgologger.WithString("file", burpFilePath), hqgologger.WithError(err))
-		}
-
-		h = append(h, burpHeaders...)
-	}
-
-	if len(cookies) > 0 {
-		h = append(h, "Cookie: "+strings.Join(cookies, "; "))
+	if len(allCookies) > 0 {
+		h = append(h, "Cookie: "+strings.Join(allCookies, "; "))
 	}
 
 	h = append(h, headers...)
@@ -385,18 +402,18 @@ func main() {
 		xcrawl3r.WithTimeout(time.Duration(viper.GetInt("request.timeout"))*time.Second),
 		xcrawl3r.WithRetries(viper.GetInt("request.retries")),
 		xcrawl3r.WithRequestsPerMinute(viper.GetInt("request.requests_per_minute")),
-		xcrawl3r.WithRandomUserAgent(randomAgent),
-		xcrawl3r.WithInsecureSkipVerify(insecureSkipVerify),
+		xcrawl3r.WithRandomUserAgent(viper.GetBool("request.random_agent")),
+		xcrawl3r.WithInsecureSkipVerify(viper.GetBool("request.insecure_skip_verify")),
 		xcrawl3r.WithHeaders(h...),
 		xcrawl3r.WithProxies(append(viper.GetStringSlice("proxies"), proxies...)...),
 		xcrawl3r.WithDepth(viper.GetInt("optimization.depth")),
 		xcrawl3r.WithParallelism(viper.GetInt("optimization.parallelism")),
 		xcrawl3r.WithMaxPages(viper.GetInt("optimization.max_pages")),
 		xcrawl3r.WithCrawlDuration(crawlDuration),
-		xcrawl3r.WithIgnoreQuery(ignoreQuery),
-		xcrawl3r.WithShapeDedup(shapeDedup),
-		xcrawl3r.WithHeadless(headless),
-		xcrawl3r.WithHeadlessTimeout(time.Duration(headlessTimeout)*time.Second),
+		xcrawl3r.WithIgnoreQuery(viper.GetBool("optimization.ignore_query")),
+		xcrawl3r.WithShapeDedup(viper.GetBool("optimization.shape_dedup")),
+		xcrawl3r.WithHeadless(viper.GetBool("headless.enabled")),
+		xcrawl3r.WithHeadlessTimeout(time.Duration(viper.GetInt("headless.timeout"))*time.Second),
 		xcrawl3r.WithDebug(debug),
 	)
 	if err != nil {
@@ -405,7 +422,7 @@ func main() {
 
 	defer crawler.Close()
 
-	if headless {
+	if viper.GetBool("headless.enabled") {
 		if err = crawler.Validate(); err != nil {
 			hqgologger.Error("headless rendering unavailable, continuing without it!", hqgologger.WithError(err))
 		}
@@ -450,6 +467,12 @@ func main() {
 			for _, output := range outputs {
 				if err := writer.Write(output, result); err != nil {
 					hqgologger.Error("failed to write result!", hqgologger.WithError(err))
+				}
+			}
+
+			for _, output := range outputs {
+				if err := writer.Flush(output); err != nil {
+					hqgologger.Error("failed to flush result!", hqgologger.WithError(err))
 				}
 			}
 		}

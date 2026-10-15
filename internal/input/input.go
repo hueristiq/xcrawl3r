@@ -2,14 +2,16 @@ package input
 
 import "os"
 
-func HasStdin() bool {
+func HasStdin() (has bool) {
 	stat, err := os.Stdin.Stat()
 	if err != nil {
-		return false
+		return
 	}
 
-	isPipedFromChrDev := (stat.Mode() & os.ModeCharDevice) == 0
-	isPipedFromFIFO := (stat.Mode() & os.ModeNamedPipe) != 0
+	isPipe := (stat.Mode() & os.ModeCharDevice) == 0
+	isFIFO := (stat.Mode() & os.ModeNamedPipe) != 0
 
-	return isPipedFromChrDev || isPipedFromFIFO
+	has = isPipe || isFIFO
+
+	return
 }

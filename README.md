@@ -2,7 +2,7 @@
 
 ![made with go](https://img.shields.io/badge/made%20with-Go-1E90FF.svg) [![go report card](https://goreportcard.com/badge/github.com/hueristiq/xcrawl3r)](https://goreportcard.com/report/github.com/hueristiq/xcrawl3r) [![release](https://img.shields.io/github/release/hueristiq/xcrawl3r?style=flat&color=1E90FF)](https://github.com/hueristiq/xcrawl3r/releases) [![open issues](https://img.shields.io/github/issues-raw/hueristiq/xcrawl3r.svg?style=flat&color=1E90FF)](https://github.com/hueristiq/xcrawl3r/issues?q=is:issue+is:open) [![closed issues](https://img.shields.io/github/issues-closed-raw/hueristiq/xcrawl3r.svg?style=flat&color=1E90FF)](https://github.com/hueristiq/xcrawl3r/issues?q=is:issue+is:closed) [![license](https://img.shields.io/badge/license-MIT-gray.svg?color=1E90FF)](https://github.com/hueristiq/xcrawl3r/blob/main/LICENSE) ![maintenance](https://img.shields.io/badge/maintained%3F-yes-1E90FF.svg) [![contribution](https://img.shields.io/badge/contributions-welcome-1E90FF.svg)](https://github.com/hueristiq/xcrawl3r/blob/main/CONTRIBUTING.md)
 
-`xcrawl3r` is a command-line utility designed to recursively spider webpages for URLs. It works by actively traversing websites - following links embedded in webpages, and parsing files (including sitemaps & robots.txt) - to uncover every URL.
+`xcrawl3r` is a command-line tool for recursively spidering webpages for URLs. It works by actively traversing websites, following links embedded in webpages, and parsing files (including sitemaps & robots.txt), to uncover every URL.
 
 Unlike [`xurlfind3r`](https://github.com/hueristiq/xurlfind3r/) that doesn't interact directly with the target, `xcrawl3r` interacts directly with the target by spidering its pages in real time. This active approach allows it to discover URLs that may be hidden or unindexed, providing a complete picture of the website’s navigational flow and content distribution. This makes `xcrawl3r` a powerful tool for security researchers, IT professionals, and anyone looking to gain insights into the URLs associated with websites.
 
@@ -134,42 +134,6 @@ Example of environment variables:
 XCRAWL3R_REQUEST_TIMEOUT=10
 ```
 
-## Headless Crawling
-
-With `--headless`, `xcrawl3r` renders each in-scope HTML page in a headless browser and harvests links from the rendered DOM — including links injected by JavaScript and single-page applications, which static crawling cannot see:
-
-```bash
-xcrawl3r -u https://example.com --headless --headless-timeout 15
-```
-
-- Requires Google Chrome or Chromium installed on the system (`chrome`, `chromium` or `chromium-browser` in `PATH`).
-- `--headless-timeout` bounds how long each page rendering may take (default `10` seconds).
-- If no browser is available, `xcrawl3r` logs a warning and continues with static crawling.
-- The Docker image does not ship Chrome — use `--headless` on the host.
-
-## TLS Verification
-
-`xcrawl3r` skips TLS certificate verification by default (`--insecure-skip-verify` defaults to `true`) — many recon targets serve broken or self-signed certificates. Crawling your own infrastructure? Enforce verification with `--insecure-skip-verify=false`.
-
-## Integration
-
-`xcrawl3r` crawls targets actively; [`xurlfind3r`](https://github.com/hueristiq/xurlfind3r/) discovers URLs passively (archives, search engines, certificate logs). Combine them to get the broadest picture:
-
-```bash
-# passive discovery first, then actively crawl every discovered host's root
-xurlfind3r -d example.com --silent | awk -F/ '{print $1"//"$3}' | sort -u | xcrawl3r --depth 2
-```
-
-Or the other way around — crawl first, then enrich with passive sources:
-
-```bash
-xcrawl3r -u https://example.com --silent > active.txt
-xurlfind3r -d example.com --silent > passive.txt
-cat active.txt passive.txt | sort -u > all.txt
-```
-
-`xcrawl3r` reads URLs from `stdin`, `--url`, or `--list`, so it slots into any such pipeline.
-
 ## Usage
 
 To start using `xcrawl3r`, open your terminal and run the following command for a list of options:
@@ -225,10 +189,9 @@ REQUEST:
      --insecure-skip-verify bool  skip TLS certificate verification (default: true)
      --requests-per-minute int    maximum requests per minute, per host (default: 0, no limit)
      --cookie string[]            cookie to include in 'name=value' format
-     --burp string                burp request file path, headers & cookies are imported
 
 PROXY:
- -p, --proxy string[]             Proxy (e.g: http://127.0.0.1:8080)
+     --proxy string[]             Proxy (e.g: http://127.0.0.1:8080)
 
  For multiple proxies use comma(,) separated value with `--proxy`
  or specify multiple `--proxy`.

@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -13,7 +12,8 @@ import (
 )
 
 type Writer struct {
-	format format
+	format  format
+	writers map[io.Writer]*bufio.Writer
 }
 
 func (w *Writer) SetFormatToJSONL() {
@@ -31,13 +31,11 @@ func (w *Writer) CreateFile(path string) (file *os.File, err error) {
 
 	switch w.format {
 	case formatTXT:
-		if extension == "" {
+		if extension != ".txt" {
 			path += ".txt"
 		}
 	case formatJSONL:
-		// .json and .jsonl are accepted as-is; any other extension is kept,
-		// and only an extensionless path gets the default.
-		if extension == "" {
+		if extension != ".json" {
 			path += ".json"
 		}
 	}
@@ -46,15 +44,13 @@ func (w *Writer) CreateFile(path string) (file *os.File, err error) {
 
 	if directory != "" {
 		if _, err = os.Stat(directory); os.IsNotExist(err) {
-			err = os.MkdirAll(directory, 0o750)
-			if err != nil {
+			if err = os.MkdirAll(directory, 0o750); err != nil {
 				return
 			}
 		}
 	}
 
-	//nolint:gosec // path is the user-provided output file path.
-	file, err = os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
+	file, err = os.OpenFile(path, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0o600) //nolint:gosec // path is the user-specified output file location.
 	if err != nil {
 		return
 	}
@@ -63,20 +59,37 @@ func (w *Writer) CreateFile(path string) (file *os.File, err error) {
 }
 
 func (w *Writer) Write(writer io.Writer, result xcrawl3r.Result) (err error) {
+	bw := w.bufferedWriter(writer)
+
 	switch w.format {
 	case formatTXT:
-		err = w.writeTXT(writer, result)
+		if _, err = bw.WriteString(result.Value + "\n"); err != nil {
+			return
+		}
 	case formatJSONL:
-		err = w.writeJSON(writer, result)
+		data := resultForJSONL{
+			URL:    result.Value,
+			Source: result.Source,
+			Via:    result.Via,
+		}
+
+		var dataJSONBytes []byte
+
+		if dataJSONBytes, err = json.Marshal(data); err != nil {
+			return
+		}
+
+		if _, err = bw.Write(append(dataJSONBytes, '\n')); err != nil {
+			return
+		}
 	}
 
 	return
 }
 
-func (w *Writer) writeTXT(writer io.Writer, result xcrawl3r.Result) (err error) {
-	bw := bufio.NewWriter(writer)
-
-	if _, err = fmt.Fprintln(bw, result.Value); err != nil {
+func (w *Writer) Flush(writer io.Writer) (err error) {
+	bw, ok := w.writers[writer]
+	if !ok {
 		return
 	}
 
@@ -87,30 +100,11 @@ func (w *Writer) writeTXT(writer io.Writer, result xcrawl3r.Result) (err error) 
 	return
 }
 
-func (w *Writer) writeJSON(writer io.Writer, result xcrawl3r.Result) (err error) {
-	data := resultForJSONL{
-		URL:    result.Value,
-		Source: result.Source,
-		Via:    result.Via,
-	}
-
-	var dataJSONBytes []byte
-
-	dataJSONBytes, err = json.Marshal(data)
-	if err != nil {
-		return
-	}
-
-	dataJSONString := string(dataJSONBytes)
-
-	bw := bufio.NewWriter(writer)
-
-	if _, err = fmt.Fprintln(bw, dataJSONString); err != nil {
-		return
-	}
-
-	if err = bw.Flush(); err != nil {
-		return
+func (w *Writer) bufferedWriter(writer io.Writer) (bw *bufio.Writer) {
+	bw, ok := w.writers[writer]
+	if !ok {
+		bw = bufio.NewWriterSize(writer, 256*1024)
+		w.writers[writer] = bw
 	}
 
 	return
@@ -125,7 +119,7 @@ type resultForJSONL struct {
 }
 
 const (
-	formatJSONL format = "JSON"
+	formatJSONL format = "JSONL"
 	formatTXT   format = "TXT"
 )
 
@@ -133,7 +127,8 @@ var ErrNoFilePathSpecified = errors.New("no file path specified")
 
 func NewWriter() (writer *Writer) {
 	writer = &Writer{
-		format: formatTXT,
+		format:  formatTXT,
+		writers: make(map[io.Writer]*bufio.Writer),
 	}
 
 	return

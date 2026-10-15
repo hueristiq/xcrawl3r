@@ -3,7 +3,6 @@ module github.com/hueristiq/xcrawl3r
 go 1.26.3
 
 require (
-	dario.cat/mergo v1.0.2
 	github.com/chromedp/chromedp v0.21.0
 	github.com/gocolly/colly/v2 v2.3.0
 	github.com/hueristiq/hq-lib-http-go v0.0.0-20261011140034-f591e873d968

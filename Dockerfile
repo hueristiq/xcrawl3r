@@ -4,7 +4,6 @@ RUN <<-EOF
 	apk --no-cache update
 	apk --no-cache upgrade
 
-	# bash is required by the Makefile's SHELL = /bin/bash directive.
 	apk --no-cache add ca-certificates curl gcc g++ git make
 EOF
 
@@ -18,7 +17,7 @@ COPY . .
 
 RUN make go-build
 
-FROM alpine:3.22
+FROM alpine:3.23
 
 RUN <<-EOF
 	apk --no-cache update
