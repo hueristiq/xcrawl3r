@@ -17,7 +17,6 @@ import (
 	hqgologgerformatter "github.com/hueristiq/hq-lib-logger-go/formatter"
 	hqgologgerlevels "github.com/hueristiq/hq-lib-logger-go/levels"
 	hqgourlparser "github.com/hueristiq/hq-lib-url-go/parser"
-	"github.com/logrusorgru/aurora/v4"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
@@ -58,8 +57,6 @@ var (
 	monochrome            bool
 	silent                bool
 	verbose               bool
-
-	au = aurora.New(aurora.WithColors(true))
 )
 
 var parser = hqgourlparser.New(hqgourlparser.WithDefaultScheme("https"))
@@ -111,7 +108,7 @@ func init() {
 	pflag.BoolVarP(&verbose, "verbose", "v", false, "")
 
 	pflag.Usage = func() {
-		hqgologger.Info(configuration.Banner(au), hqgologger.WithoutTimestamp(), hqgologger.WithoutLabel())
+		hqgologger.Info(configuration.Banner, hqgologger.WithoutTimestamp(), hqgologger.WithoutLabel())
 
 		h := "USAGE:\n"
 		h += fmt.Sprintf(" %s [OPTIONS]\n", configuration.Name)
@@ -124,7 +121,7 @@ func init() {
 			defaultConfigurationFilePath = strings.ReplaceAll(defaultConfigurationFilePath, userConfigDirectoryPath, "$HOME/.config")
 		}
 
-		h += fmt.Sprintf(" -c, --configuration string       (default: %v)\n", au.Underline(defaultConfigurationFilePath).Bold())
+		h += fmt.Sprintf(" -c, --configuration string       (default: %v)\n", defaultConfigurationFilePath)
 
 		h += "\nINPUT:\n"
 		h += " -u, --url string[]               target URL\n"
@@ -285,12 +282,10 @@ func init() {
 			hqgologger.Fatal("failed setting logger level!", hqgologger.WithError(err))
 		}
 	}
-
-	au = aurora.New(aurora.WithColors(!monochrome))
 }
 
 func main() {
-	hqgologger.Info(configuration.Banner(au), hqgologger.WithoutLabel())
+	hqgologger.Info(configuration.Banner, hqgologger.WithoutLabel())
 
 	signal.Ignore(syscall.SIGPIPE)
 

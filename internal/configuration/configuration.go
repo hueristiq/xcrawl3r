@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	hqgohttpheader "github.com/hueristiq/hq-lib-http-go/header"
-	"github.com/logrusorgru/aurora/v4"
 	"gopkg.in/yaml.v3"
 )
 
@@ -89,22 +88,18 @@ func (cfg *Configuration) Write(path string) (err error) {
 
 const Name = "xcrawl3r"
 
-var Version = "1.4.0"
+var Version = "0.0.0"
 
-func Banner(au *aurora.Aurora) (banner string) {
-	banner = au.Sprintf(
-		au.BrightBlue(`
-                             _ _____
-__  _____ _ __ __ ___      _| |___ / _ __
-\ \/ / __| '__/ _`+"`"+` \ \ /\ / / | |_ \| '__|
- >  < (__| | | (_| |\ V  V /| |___) | |
-/_/\_\___|_|  \__,_| \_/\_/ |_|____/|_|
-                                    %s`).Bold(),
-		au.BrightRed("v"+Version).Bold().Italic(),
-	) + "\n\n"
+var Banner = fmt.Sprintf(`
+                                           _ _____
+              __  _____ _ __ __ ___      _| |___ / _ __
+              \ \/ / __| '__/ _`+"`"+` \ \ /\ / / | |_ \| '__|
+               >  < (__| | | (_| |\ V  V /| |___) | |
+              /_/\_\___|_|  \__,_| \_/\_/ |_|____/|_| v%s-dev-f711bbd
 
-	return
-}
+                 Hueristiq Limited <hueristiq.com>
+
+`, Version)
 
 func UserConfigDirectoryPath() (userConfigDirectoryPath string, err error) {
 	userConfigDirectoryPath, err = os.UserConfigDir()

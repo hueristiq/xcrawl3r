@@ -10,7 +10,6 @@ require (
 	github.com/hueristiq/hq-lib-logger-go v0.0.0-20261011132023-c2e708c1233d
 	github.com/hueristiq/hq-lib-retrier-go v0.0.0-20261011132200-c4007130d81a
 	github.com/hueristiq/hq-lib-url-go v0.0.0-20261011135834-c92a0bfe9148
-	github.com/logrusorgru/aurora/v4 v4.0.0
 	github.com/spf13/pflag v1.0.10
 	github.com/spf13/viper v1.21.0
 	golang.org/x/net v0.61.0
@@ -24,7 +23,7 @@ require (
 	github.com/antchfx/xmlquery v1.5.2 // indirect
 	github.com/antchfx/xpath v1.3.9 // indirect
 	github.com/bits-and-blooms/bitset v1.26.0 // indirect
-	github.com/chromedp/cdproto v0.157.9 // indirect
+	github.com/chromedp/cdproto v0.158.3 // indirect
 	github.com/fsnotify/fsnotify v1.10.1 // indirect
 	github.com/go-json-experiment/json v0.0.0-20260820222146-c27c302e5fc3 // indirect
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
