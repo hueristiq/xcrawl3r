@@ -9,7 +9,11 @@ import (
 	"path"
 	"regexp"
 	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
 
+	"github.com/chromedp/chromedp"
 	"github.com/gocolly/colly/v2"
 )
 
@@ -129,10 +133,10 @@ func (c *Crawler) registerHandlers(ctx context.Context, collector *colly.Collect
 			c.processLink(ctx, response.Request, link, via, scope, results)
 		}
 
-		if isHTML && c.headless != nil {
-			var renderedURLs []string
+		if isHTML && c.renderer != nil {
+			var renderedHTML string
 
-			renderedURLs, err := c.render(ctx, response.Request.URL.String())
+			renderedHTML, err := c.render(ctx, response.Request.URL.String())
 			if err != nil {
 				emit(ctx, results, Result{
 					Type:   ResultError,
@@ -143,9 +147,10 @@ func (c *Crawler) registerHandlers(ctx context.Context, collector *colly.Collect
 				return
 			}
 
-			for _, link := range renderedURLs {
-				c.processLink(ctx, response.Request, link, "headless", scope, results)
-			}
+			// Replace the body with the rendered document so colly's HTML
+			// parsing (and therefore the OnHTML handlers) runs against the
+			// post-JavaScript DOM.
+			response.Body = []byte(renderedHTML)
 		}
 	})
 
@@ -370,6 +375,115 @@ func parseRobots(body []byte) (rules robotsRules) {
 			rules.sitemaps = append(rules.sitemaps, value)
 		}
 	}
+
+	return
+}
+
+const defaultRenderTimeout = 10 * time.Second
+
+type renderer struct {
+	timeout time.Duration
+
+	mu          sync.Mutex
+	browser     context.Context //nolint:containedctx // browser lifecycle handle, not a request scope.
+	cancel      context.CancelFunc
+	cancelAlloc context.CancelFunc
+	started     atomic.Bool
+	err         error
+}
+
+func (r *renderer) start() (err error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if r.started.Load() {
+		return r.err
+	}
+
+	allocCtx, cancelAlloc := chromedp.NewExecAllocator(context.Background(), chromedp.DefaultExecAllocatorOptions[:]...)
+
+	r.browser, r.cancel = chromedp.NewContext(allocCtx)
+
+	r.err = chromedp.Do(r.browser, chromedp.Evaluate[chromedp.Void]("1"))
+	if r.err != nil {
+		r.cancel()
+		cancelAlloc()
+
+		r.browser = nil
+		r.cancel = nil
+
+		return
+	}
+
+	r.cancelAlloc = cancelAlloc
+	r.started.Store(true)
+
+	return
+}
+
+func (r *renderer) close() {
+	if !r.started.Load() {
+		return
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if !r.started.Load() {
+		return
+	}
+
+	r.cancel()
+	r.cancelAlloc()
+
+	r.browser = nil
+	r.cancel = nil
+	r.cancelAlloc = nil
+	r.err = nil
+	r.started.Store(false)
+}
+
+func (c *Crawler) Validate() (err error) {
+	if c.renderer == nil {
+		return
+	}
+
+	err = c.renderer.start()
+
+	return
+}
+
+func (c *Crawler) Close() {
+	if c.renderer != nil {
+		c.renderer.close()
+	}
+}
+
+// render loads rawURL in a headless Chrome tab and returns the rendered
+// document.
+func (c *Crawler) render(ctx context.Context, rawURL string) (renderedHTML string, err error) {
+	if err = c.renderer.start(); err != nil {
+		return
+	}
+
+	tabCtx, cancelTab := chromedp.NewContext(c.renderer.browser)
+	defer cancelTab()
+
+	tabCtx, cancelTimeout := context.WithTimeout(tabCtx, c.renderer.timeout)
+	defer cancelTimeout()
+
+	stop := context.AfterFunc(ctx, cancelTimeout)
+	defer stop()
+
+	if err = chromedp.Do(tabCtx, //nolint:contextcheck // tabCtx is a chromedp tab context, derived from the browser context.
+		chromedp.Navigate(rawURL),
+		chromedp.WaitReady("body"),
+		chromedp.Sleep(500*time.Millisecond),
+	); err != nil {
+		return
+	}
+
+	renderedHTML, err = chromedp.Run(tabCtx, chromedp.OuterHTML(chromedp.CSS("html"))) //nolint:contextcheck // tabCtx is a chromedp tab context.
 
 	return
 }

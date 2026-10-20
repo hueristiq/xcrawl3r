@@ -49,8 +49,8 @@ var (
 	crawlDuration         string
 	ignoreQuery           bool
 	shapeDedup            bool
-	headless              bool
-	headlessTimeout       int
+	render                bool
+	renderTimeout         int
 	outputInJSONL         bool
 	outputFilePath        string
 	outputDirectoryPath   string
@@ -77,29 +77,29 @@ func rootDomain(rawURL string) (domain string) {
 
 func init() {
 	pflag.StringVarP(&configurationFilePath, "configuration", "c", configuration.DefaultConfigurationFilePath(), "")
-	pflag.StringSliceVarP(&urls, "url", "u", []string{}, "")
+	pflag.StringSliceVar(&urls, "url", []string{}, "")
 	pflag.StringVarP(&urlsListFilePath, "list", "l", "", "")
 	pflag.StringSliceVarP(&domains, "domain", "d", []string{}, "")
 	pflag.BoolVar(&includeSubdomains, "include-subdomains", false, "")
+	pflag.StringSliceVar(&proxies, "proxy", []string{}, "")
 	pflag.IntVar(&delay, "delay", 0, "")
 	pflag.IntVar(&randomDelay, "random-delay", 0, "")
 	pflag.StringSliceVarP(&headers, "header", "H", []string{}, "")
+	pflag.BoolVar(&randomAgent, "random-agent", false, "")
 	pflag.StringSliceVar(&cookies, "cookie", []string{}, "")
+	pflag.BoolVar(&insecureSkipVerify, "insecure-skip-verify", false, "skip TLS certificate verification")
 	pflag.IntVar(&timeout, "timeout", 0, "")
 	pflag.IntVar(&retries, "retries", 0, "")
-	pflag.IntVar(&requestsPerMinute, "requests-per-minute", 0, "")
-	pflag.BoolVar(&randomAgent, "random-agent", false, "")
-	pflag.BoolVar(&insecureSkipVerify, "insecure-skip-verify", false, "skip TLS certificate verification")
-	pflag.StringSliceVar(&proxies, "proxy", []string{}, "")
 	pflag.IntVar(&depth, "depth", 0, "")
+	pflag.IntVar(&maxPages, "max-pages", 0, "")
 	pflag.IntVarP(&concurrency, "concurrency", "C", 0, "")
 	pflag.IntVarP(&parallelism, "parallelism", "P", 0, "")
-	pflag.IntVar(&maxPages, "max-pages", 0, "")
+	pflag.IntVar(&requestsPerMinute, "requests-per-minute", 0, "")
 	pflag.StringVar(&crawlDuration, "crawl-duration", "", "")
 	pflag.BoolVar(&ignoreQuery, "ignore-query", false, "")
 	pflag.BoolVar(&shapeDedup, "shape-dedup", false, "")
-	pflag.BoolVar(&headless, "headless", false, "")
-	pflag.IntVar(&headlessTimeout, "headless-timeout", 0, "")
+	pflag.BoolVar(&render, "render", false, "")
+	pflag.IntVar(&renderTimeout, "render-timeout", 0, "")
 	pflag.BoolVar(&outputInJSONL, "jsonl", false, "")
 	pflag.StringVarP(&outputFilePath, "output", "o", "", "")
 	pflag.StringVarP(&outputDirectoryPath, "output-directory", "O", "", "")
@@ -124,36 +124,20 @@ func init() {
 		h += fmt.Sprintf(" -c, --configuration string       (default: %v)\n", defaultConfigurationFilePath)
 
 		h += "\nINPUT:\n"
-		h += " -u, --url string[]               target URL\n"
+		h += "     --url string[]               target URL\n"
 		h += " -l, --list string                target URLs file path\n"
 
 		h += "\n For multiple URLs, use comma(,) separated value with `--url`,\n"
 		h += " specify multiple `--url`, load from file with `--list` or load from stdin.\n"
 
 		h += "\nSCOPE:\n"
-		h += " -d, --domain string[]            match domain(s) URLs\n"
+		h += " -d, --domain string[]            domain to match URLs for\n"
 
 		h += "\n For multiple domains, use comma(,) separated value with `--domain`\n"
-		h += " or specify multiple `--domain`.\n"
-
-		h += "\n     --include-subdomains bool    with domain(s), match subdomains' URLs\n"
-
+		h += " or specify multiple `--domain`."
 		h += "\n Without `--domain`, only URLs on the target's host are matched.\n"
 
-		h += "\nREQUEST:\n"
-		h += "     --delay int                  delay between each request in seconds\n"
-		h += "     --random-delay int           random delay between each request in seconds\n"
-		h += " -H, --header string[]            header to include in 'header:value' format\n"
-
-		h += "\n For multiple headers, use comma(,) separated value with `--header`\n"
-		h += " or specify multiple `--header`.\n"
-
-		h += "\n     --timeout int                time to wait for request in seconds\n"
-		h += "     --retries int                maximum attempts per request, `0` for no retries\n"
-		h += "     --requests-per-minute int    maximum requests per minute, per host, `0` for no limit\n"
-		h += "     --random-agent bool          use a random User-Agent for each request\n"
-		h += "     --insecure-skip-verify bool  skip TLS certificate verification\n"
-		h += "     --cookie string[]            cookie to include in 'name=value' format\n"
+		h += "\n     --include-subdomains bool    match subdomain's URLs\n"
 
 		h += "\nPROXY:\n"
 		h += "     --proxy string[]             proxy (e.g: http://127.0.0.1:8080)\n"
@@ -162,17 +146,29 @@ func init() {
 		h += " or specify multiple `--proxy`.\n"
 
 		h += "\nOPTIMIZATION:\n"
+		h += "     --delay int                  delay between each request in seconds\n"
+		h += "     --random-delay int           random delay between each request in seconds\n"
+		h += " -H, --header string[]            header to include in 'header:value' format\n"
+
+		h += "\n For multiple headers, use comma(,) separated value with `--header`\n"
+		h += " or specify multiple `--header`.\n"
+
+		h += "\n     --random-agent bool          use a random User-Agent for each request\n"
+		h += "     --cookie string[]            cookie to include in 'name=value' format\n"
+		h += "     --insecure-skip-verify bool  skip TLS certificate verification\n"
+		h += "     --timeout int                time to wait for request in seconds\n"
+		h += "     --retries int                maximum attempts per request, `0` for no retries\n"
+
 		h += "     --depth int                  maximum depth to crawl, `0` for infinite\n"
+		h += "     --max-pages int              maximum pages to crawl per target, `0` for no limit\n"
 		h += " -C, --concurrency int            number of concurrent inputs to process\n"
 		h += " -P, --parallelism int            number of concurrent fetchers to use\n"
-		h += "     --max-pages int              maximum pages to crawl per target, `0` for no limit\n"
+		h += "     --requests-per-minute int    maximum requests per minute, per host, `0` for no limit\n"
 		h += "     --crawl-duration duration    maximum duration per target crawl (e.g: 10s, 5m), `0` for no limit\n"
 		h += "     --ignore-query bool          deduplicate URLs ignoring the query string\n"
 		h += "     --shape-dedup bool           deduplicate URLs by shape (numbers, UUIDs, dates normalized)\n"
-
-		h += "\nHEADLESS:\n"
-		h += "     --headless bool              render pages in a headless browser, requires Chrome/Chromium\n"
-		h += "     --headless-timeout int       time to wait for page rendering in seconds\n"
+		h += "     --render bool                render pages in a headless browser, requires Chrome/Chromium\n"
+		h += "     --render-timeout int         time to wait for page rendering in seconds\n"
 
 		h += "\nOUTPUT:\n"
 		h += "     --jsonl bool                 output in JSONL(ines)\n"
@@ -373,12 +369,12 @@ func main() {
 		shapeDedup = cfg.Optimization.ShapeDedup
 	}
 
-	if !pflag.Lookup("headless").Changed {
-		headless = cfg.Headless.Enabled
+	if !pflag.Lookup("render").Changed {
+		render = cfg.Render.Enabled
 	}
 
-	if !pflag.Lookup("headless-timeout").Changed {
-		headlessTimeout = cfg.Headless.Timeout
+	if !pflag.Lookup("render-timeout").Changed {
+		renderTimeout = cfg.Render.Timeout
 	}
 
 	headers = append(cfg.Request.Headers, headers...)
@@ -421,8 +417,8 @@ func main() {
 		CrawlDuration:      parsedCrawlDuration,
 		IgnoreQuery:        ignoreQuery,
 		ShapeDedup:         shapeDedup,
-		Headless:           headless,
-		HeadlessTimeout:    time.Duration(headlessTimeout) * time.Second,
+		Render:             render,
+		RenderTimeout:      time.Duration(renderTimeout) * time.Second,
 	})
 	if err != nil {
 		hqgologger.Fatal("failed creating crawler!", hqgologger.WithError(err))
@@ -430,9 +426,9 @@ func main() {
 
 	defer crawler.Close()
 
-	if headless {
+	if render {
 		if err = crawler.Validate(); err != nil {
-			hqgologger.Error("headless rendering unavailable, continuing without it!", hqgologger.WithError(err))
+			hqgologger.Error("JS rendering unavailable, continuing without it!", hqgologger.WithError(err))
 		}
 	}
 

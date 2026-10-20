@@ -21,7 +21,7 @@ Unlike [`xurlfind3r`](https://github.com/hueristiq/xurlfind3r/) that doesn't int
 		- [Basic](#basic)
 		- [Multiple URLs](#multiple-urls)
 		- [Including subdomain URLs](#including-subdomain-urls)
-		- [With headless rendering](#with-headless-rendering)
+		- [With JS rendering](#with-js-rendering)
 		- [Writing output to a file](#writing-output-to-a-file)
 		- [JSONL output](#jsonl-output)
 - [Contributing](#contributing)
@@ -214,9 +214,9 @@ OPTIMIZATION:
      --ignore-query bool          deduplicate URLs ignoring the query string
      --shape-dedup bool           deduplicate URLs by shape (numbers, UUIDs, dates normalized)
 
-HEADLESS:
-     --headless bool              render pages in a headless browser, requires Chrome/Chromium
-     --headless-timeout int       time to wait for page rendering in seconds
+RENDER:
+     --render bool                 render pages in a headless browser, requires Chrome/Chromium
+     --render-timeout int          time to wait for page rendering in seconds
 
 OUTPUT:
      --jsonl bool                 output in JSONL(ines)
@@ -278,12 +278,12 @@ Match subdomains' URLs as well with `--include-subdomains`:
 xcrawl3r -u https://www.example.com -d example.com --include-subdomains
 ```
 
-#### With headless rendering
+#### With JS rendering
 
 Render pages in a headless browser to discover dynamically generated URLs:
 
 ```bash
-xcrawl3r -u https://example.com --headless
+xcrawl3r -u https://example.com --render
 ```
 
 #### Writing output to a file

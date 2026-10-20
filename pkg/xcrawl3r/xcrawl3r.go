@@ -24,7 +24,7 @@ type Crawler struct {
 
 	storage *storage.InMemoryStorage
 
-	headless *headless
+	renderer *renderer
 
 	seen sync.Map
 }
@@ -129,8 +129,8 @@ type Configuration struct {
 	CrawlDuration      time.Duration
 	IgnoreQuery        bool
 	ShapeDedup         bool
-	Headless           bool
-	HeadlessTimeout    time.Duration
+	Render             bool
+	RenderTimeout      time.Duration
 }
 
 func (cfg *Configuration) validate() (err error) {
@@ -197,13 +197,13 @@ func New(cfg *Configuration) (crawler *Crawler, err error) {
 		return
 	}
 
-	if cfg.Headless {
-		timeout := cfg.HeadlessTimeout
+	if cfg.Render {
+		timeout := cfg.RenderTimeout
 		if timeout <= 0 {
-			timeout = defaultHeadlessTimeout
+			timeout = defaultRenderTimeout
 		}
 
-		crawler.headless = &headless{
+		crawler.renderer = &renderer{
 			timeout: timeout,
 		}
 	}

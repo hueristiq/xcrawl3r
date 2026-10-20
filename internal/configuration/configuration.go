@@ -33,7 +33,7 @@ type Optimization struct {
 	ShapeDedup    bool   `yaml:"shape_dedup"`
 }
 
-type Headless struct {
+type Render struct {
 	Enabled bool `yaml:"enabled"`
 	Timeout int  `yaml:"timeout"`
 }
@@ -43,7 +43,7 @@ type Configuration struct {
 	Request      Request      `yaml:"request"`
 	Proxies      []string     `yaml:"proxies"`
 	Optimization Optimization `yaml:"optimization"`
-	Headless     Headless     `yaml:"headless"`
+	Render       Render       `yaml:"render"`
 }
 
 func (cfg *Configuration) Write(path string) (err error) {
@@ -136,7 +136,7 @@ var DefaultConfiguration = Configuration{
 		Concurrency: 5,
 		Parallelism: 5,
 	},
-	Headless: Headless{
+	Render: Render{
 		Timeout: 10,
 	},
 }
@@ -212,7 +212,7 @@ func hasMissingDefaults(cfg *Configuration) (missing bool) {
 		return true
 	}
 
-	if cfg.Headless.Timeout == 0 {
+	if cfg.Render.Timeout == 0 {
 		return true
 	}
 
