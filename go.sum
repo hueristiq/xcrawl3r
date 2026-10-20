@@ -1,3 +1,5 @@
+dario.cat/mergo v1.0.2 h1:85+piFYR1tMbRrLcDwR18y4UKJ3aH1Tbzi24VRW1TK8=
+dario.cat/mergo v1.0.2/go.mod h1:E/hbnu0NxMFBjpMIE34DRGLWqDy0g5FuKDhCb31ngxA=
 github.com/PuerkitoBio/goquery v1.13.0 h1:mqHbjD7Jmnul4DTR24LKTjo1uUmHUh072kteGV+xpFM=
 github.com/PuerkitoBio/goquery v1.13.0/go.mod h1:Hip5mdBL8K2wEGKJdr27sRaNwIdDajmCwB/ExUPwW+g=
 github.com/andybalholm/cascadia v1.3.5 h1:RLjq12WJy58dN6eCIQrz0bAGZkztHWsEPFxP53Y7Ms8=
@@ -47,8 +49,6 @@ github.com/hueristiq/hq-lib-logger-go v0.0.0-20261011132023-c2e708c1233d h1:O0ko
 github.com/hueristiq/hq-lib-logger-go v0.0.0-20261011132023-c2e708c1233d/go.mod h1:fRDOBLlfTb04nVeZgRJDshT9P683TMaVUsvMIoPjbu4=
 github.com/hueristiq/hq-lib-retrier-go v0.0.0-20261011132200-c4007130d81a h1:WPY5yA/okhaRZUWwLfjMo781Df5nPO1HHXFa2rveQvQ=
 github.com/hueristiq/hq-lib-retrier-go v0.0.0-20261011132200-c4007130d81a/go.mod h1:REHgf5NmCSmATCxDhTWmnl5wRMVOknoPh+p0ON8UqCk=
-github.com/hueristiq/hq-lib-url-go v0.0.0-20261011135834-c92a0bfe9148 h1:WJ3u1AZHJn8K1VfCPz2kTd7moG9H6WbiT38JoSDniSw=
-github.com/hueristiq/hq-lib-url-go v0.0.0-20261011135834-c92a0bfe9148/go.mod h1:4euQEewth0mran7PKFRv1dEHVBCLE/kcEG8+tbLS8U4=
 github.com/kennygrant/sanitize v1.2.4 h1:gN25/otpP5vAsO2djbMhF/LQX6R7+O1TB4yv8NzpJ3o=
 github.com/kennygrant/sanitize v1.2.4/go.mod h1:LGsjYYtgxbetdg5owWB2mpgUL6e2nfw2eObZ0u0qvak=
 github.com/kr/pretty v0.3.1 h1:flRD4NNwYAUpkphVc1HcthR4KEIFJ65n8Mw5qdRn3LE=

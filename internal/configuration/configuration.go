@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
+	"reflect"
 
-	hqgohttpheader "github.com/hueristiq/hq-lib-http-go/header"
+	"dario.cat/mergo"
 	"gopkg.in/yaml.v3"
 )
 
@@ -88,14 +88,14 @@ func (cfg *Configuration) Write(path string) (err error) {
 
 const Name = "xcrawl3r"
 
-var Version = "0.0.0"
+var Version = "v0.0.0-branch-00000000"
 
 var Banner = fmt.Sprintf(`
                                            _ _____
               __  _____ _ __ __ ___      _| |___ / _ __
               \ \/ / __| '__/ _`+"`"+` \ \ /\ / / | |_ \| '__|
                >  < (__| | | (_| |\ V  V /| |___) | |
-              /_/\_\___|_|  \__,_| \_/\_/ |_|____/|_| v%s-dev-f711bbd
+              /_/\_\___|_|  \__,_| \_/\_/ |_|____/|_| %s
 
                  Hueristiq Limited <hueristiq.com>
 
@@ -126,9 +126,6 @@ func DefaultConfigurationFilePath() (path string) {
 var DefaultConfiguration = Configuration{
 	Version: Version,
 	Request: Request{
-		Headers: []string{
-			DefaultUserAgent,
-		},
 		Timeout:            10,
 		Retries:            3,
 		InsecureSkipVerify: true,
@@ -144,21 +141,18 @@ var DefaultConfiguration = Configuration{
 	},
 }
 
-// DefaultUserAgent is the built-in User-Agent header value, applied only
-// when no User-Agent is configured.
-var DefaultUserAgent = fmt.Sprintf("%s: %s v%s (https://github.com/hueristiq/%s)", hqgohttpheader.UserAgent, Name, Version, Name)
+// booleanPreserver keeps mergo from treating an explicit `false` in the
+// user's configuration as an unset field to overwrite with a default.
+type booleanPreserver struct{}
 
-// WithDefaultUserAgent appends the built-in User-Agent header to headers when
-// none of the entries is a User-Agent header.
-func WithDefaultUserAgent(headers []string) (withUserAgent []string) {
-	for _, header := range headers {
-		key, _, found := strings.Cut(header, ":")
-		if found && strings.EqualFold(strings.TrimSpace(key), hqgohttpheader.UserAgent.String()) {
-			return headers
+func (booleanPreserver) Transformer(typ reflect.Type) func(dst, src reflect.Value) error {
+	if typ.Kind() == reflect.Bool {
+		return func(dst, src reflect.Value) error {
+			return nil
 		}
 	}
 
-	return append(headers, DefaultUserAgent)
+	return nil
 }
 
 func CreateOrUpdate(path string) (err error) {
@@ -181,18 +175,45 @@ func CreateOrUpdate(path string) (err error) {
 			return
 		}
 
-		raw, rawErr := readRaw(path)
-		if rawErr != nil {
-			return rawErr
-		}
+		if cfg.Version != Version || hasMissingDefaults(&cfg) {
+			if err = mergo.Merge(&cfg, DefaultConfiguration, mergo.WithTransformers(booleanPreserver{})); err != nil {
+				return
+			}
 
-		if cfg.Version != Version || fillMissingDefaults(&cfg, raw) {
 			cfg.Version = Version
 
 			if err = cfg.Write(path); err != nil {
 				return
 			}
 		}
+	}
+
+	return
+}
+
+func hasMissingDefaults(cfg *Configuration) (missing bool) {
+	if cfg.Request.Timeout == 0 {
+		return true
+	}
+
+	if cfg.Request.Retries == 0 {
+		return true
+	}
+
+	if cfg.Optimization.Depth == 0 {
+		return true
+	}
+
+	if cfg.Optimization.Concurrency == 0 {
+		return true
+	}
+
+	if cfg.Optimization.Parallelism == 0 {
+		return true
+	}
+
+	if cfg.Headless.Timeout == 0 {
+		return true
 	}
 
 	return
@@ -212,196 +233,6 @@ func Read(path string) (cfg Configuration, err error) {
 
 	if err = yaml.NewDecoder(file).Decode(&cfg); err != nil {
 		return
-	}
-
-	return
-}
-
-func readRaw(path string) (raw map[string]any, err error) {
-	file, err := os.Open(path) //nolint:gosec // path is the user-specified configuration file location.
-	if err != nil {
-		return
-	}
-
-	defer func() {
-		if closeErr := file.Close(); err == nil && closeErr != nil {
-			err = closeErr
-		}
-	}()
-
-	raw = make(map[string]any)
-
-	if err = yaml.NewDecoder(file).Decode(&raw); err != nil {
-		return
-	}
-
-	return
-}
-
-func rawHas(raw map[string]any, path ...string) (has bool) {
-	var node any = raw
-
-	for _, key := range path {
-		mapping, ok := node.(map[string]any)
-		if !ok {
-			return false
-		}
-
-		node, ok = mapping[key]
-		if !ok {
-			return false
-		}
-	}
-
-	return true
-}
-
-func fillMissingDefaults(cfg *Configuration, raw map[string]any) (changed bool) {
-	changed = fillRequestDefaults(cfg, raw)
-
-	if !rawHas(raw, "proxies") {
-		cfg.Proxies = DefaultConfiguration.Proxies
-		changed = true
-	}
-
-	if fillOptimizationDefaults(cfg, raw) {
-		changed = true
-	}
-
-	if fillHeadlessDefaults(cfg, raw) {
-		changed = true
-	}
-
-	return
-}
-
-func fillRequestDefaults(cfg *Configuration, raw map[string]any) (changed bool) {
-	request, ok := raw["request"].(map[string]any)
-	if !ok {
-		if !rawHas(raw, "request") {
-			cfg.Request = DefaultConfiguration.Request
-			changed = true
-		}
-
-		return
-	}
-
-	if !rawHas(request, "delay") {
-		cfg.Request.Delay = DefaultConfiguration.Request.Delay
-		changed = true
-	}
-
-	if !rawHas(request, "random_delay") {
-		cfg.Request.RandomDelay = DefaultConfiguration.Request.RandomDelay
-		changed = true
-	}
-
-	if !rawHas(request, "headers") {
-		cfg.Request.Headers = DefaultConfiguration.Request.Headers
-		changed = true
-	}
-
-	if !rawHas(request, "cookies") {
-		cfg.Request.Cookies = DefaultConfiguration.Request.Cookies
-		changed = true
-	}
-
-	if !rawHas(request, "timeout") {
-		cfg.Request.Timeout = DefaultConfiguration.Request.Timeout
-		changed = true
-	}
-
-	if !rawHas(request, "retries") {
-		cfg.Request.Retries = DefaultConfiguration.Request.Retries
-		changed = true
-	}
-
-	if !rawHas(request, "requests_per_minute") {
-		cfg.Request.RequestsPerMinute = DefaultConfiguration.Request.RequestsPerMinute
-		changed = true
-	}
-
-	if !rawHas(request, "random_agent") {
-		cfg.Request.RandomAgent = DefaultConfiguration.Request.RandomAgent
-		changed = true
-	}
-
-	if !rawHas(request, "insecure_skip_verify") {
-		cfg.Request.InsecureSkipVerify = DefaultConfiguration.Request.InsecureSkipVerify
-		changed = true
-	}
-
-	return
-}
-
-func fillOptimizationDefaults(cfg *Configuration, raw map[string]any) (changed bool) {
-	optimization, ok := raw["optimization"].(map[string]any)
-	if !ok {
-		if !rawHas(raw, "optimization") {
-			cfg.Optimization = DefaultConfiguration.Optimization
-			changed = true
-		}
-
-		return
-	}
-
-	if !rawHas(optimization, "depth") {
-		cfg.Optimization.Depth = DefaultConfiguration.Optimization.Depth
-		changed = true
-	}
-
-	if !rawHas(optimization, "concurrency") {
-		cfg.Optimization.Concurrency = DefaultConfiguration.Optimization.Concurrency
-		changed = true
-	}
-
-	if !rawHas(optimization, "parallelism") {
-		cfg.Optimization.Parallelism = DefaultConfiguration.Optimization.Parallelism
-		changed = true
-	}
-
-	if !rawHas(optimization, "max_pages") {
-		cfg.Optimization.MaxPages = DefaultConfiguration.Optimization.MaxPages
-		changed = true
-	}
-
-	if !rawHas(optimization, "crawl_duration") {
-		cfg.Optimization.CrawlDuration = DefaultConfiguration.Optimization.CrawlDuration
-		changed = true
-	}
-
-	if !rawHas(optimization, "ignore_query") {
-		cfg.Optimization.IgnoreQuery = DefaultConfiguration.Optimization.IgnoreQuery
-		changed = true
-	}
-
-	if !rawHas(optimization, "shape_dedup") {
-		cfg.Optimization.ShapeDedup = DefaultConfiguration.Optimization.ShapeDedup
-		changed = true
-	}
-
-	return
-}
-
-func fillHeadlessDefaults(cfg *Configuration, raw map[string]any) (changed bool) {
-	headless, ok := raw["headless"].(map[string]any)
-	if !ok {
-		if !rawHas(raw, "headless") {
-			cfg.Headless = DefaultConfiguration.Headless
-			changed = true
-		}
-
-		return
-	}
-
-	if !rawHas(headless, "enabled") {
-		cfg.Headless.Enabled = DefaultConfiguration.Headless.Enabled
-		changed = true
-	}
-
-	if !rawHas(headless, "timeout") {
-		cfg.Headless.Timeout = DefaultConfiguration.Headless.Timeout
-		changed = true
 	}
 
 	return

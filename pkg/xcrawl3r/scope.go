@@ -21,14 +21,14 @@ type scope struct {
 
 func (c *Crawler) scopeFor(parsedTargetURL *hqgourlparser.URL) (s *scope) {
 	s = &scope{
-		includeSubdomains: c.opts.includeSubdomains,
-		maxPages:          c.opts.maxPages,
+		includeSubdomains: c.cfg.IncludeSubdomains,
+		maxPages:          c.cfg.MaxPages,
 	}
 
-	if len(c.opts.domains) > 0 {
-		s.domains = make([]string, 0, len(c.opts.domains))
+	if len(c.cfg.Domains) > 0 {
+		s.domains = make([]string, 0, len(c.cfg.Domains))
 
-		for _, domain := range c.opts.domains {
+		for _, domain := range c.cfg.Domains {
 			s.domains = append(s.domains, strings.ToLower(domain))
 		}
 	} else {

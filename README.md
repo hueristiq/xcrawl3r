@@ -17,6 +17,13 @@ Unlike [`xurlfind3r`](https://github.com/hueristiq/xurlfind3r/) that doesn't int
 	- [Install on Docker (With Docker Installed)](#install-on-docker-with-docker-installed)
 - [Post Installation](#post-installation)
 - [Usage](#usage)
+	- [Examples](#examples)
+		- [Basic](#basic)
+		- [Multiple URLs](#multiple-urls)
+		- [Including subdomain URLs](#including-subdomain-urls)
+		- [With headless rendering](#with-headless-rendering)
+		- [Writing output to a file](#writing-output-to-a-file)
+		- [JSONL output](#jsonl-output)
 - [Contributing](#contributing)
 - [Licensing](#licensing)
 
@@ -145,12 +152,14 @@ xcrawl3r -h
 Here's what the help message looks like:
 
 ```text
-                             _ _____
-__  _____ _ __ __ ___      _| |___ / _ __
-\ \/ / __| '__/ _` \ \ /\ / / | |_ \| '__|
- >  < (__| | | (_| |\ V  V /| |___) | |
-/_/\_\___|_|  \__,_| \_/\_/ |_|____/|_|
-                                    v1.4.0
+
+                                           _ _____
+              __  _____ _ __ __ ___      _| |___ / _ __
+              \ \/ / __| '__/ _` \ \ /\ / / | |_ \| '__|
+               >  < (__| | | (_| |\ V  V /| |___) | |
+              /_/\_\___|_|  \__,_| \_/\_/ |_|____/|_| v0.0.0-branch-00000000
+
+                 Hueristiq Limited <hueristiq.com>
 
 USAGE:
  xcrawl3r [OPTIONS]
@@ -166,7 +175,7 @@ INPUT:
  specify multiple `--url`, load from file with `--list` or load from stdin.
 
 SCOPE:
- -d, --domain string[]            match domain(s)  URLs
+ -d, --domain string[]            match domain(s) URLs
 
  For multiple domains, use comma(,) separated value with `--domain`
  or specify multiple `--domain`.
@@ -183,39 +192,114 @@ REQUEST:
  For multiple headers, use comma(,) separated value with `--header`
  or specify multiple `--header`.
 
-     --timeout int                time to wait for request in seconds (default: 10)
-     --retries int                maximum attempts per request, `0` for no retries (default: 3)
+     --timeout int                time to wait for request in seconds
+     --retries int                maximum attempts per request, `0` for no retries
+     --requests-per-minute int    maximum requests per minute, per host, `0` for no limit
      --random-agent bool          use a random User-Agent for each request
-     --insecure-skip-verify bool  skip TLS certificate verification (default: true)
-     --requests-per-minute int    maximum requests per minute, per host (default: 0, no limit)
+     --insecure-skip-verify bool  skip TLS certificate verification
      --cookie string[]            cookie to include in 'name=value' format
 
 PROXY:
-     --proxy string[]             Proxy (e.g: http://127.0.0.1:8080)
+     --proxy string[]             proxy (e.g: http://127.0.0.1:8080)
 
- For multiple proxies use comma(,) separated value with `--proxy`
+ For multiple proxies, use comma(,) separated value with `--proxy`
  or specify multiple `--proxy`.
 
 OPTIMIZATION:
-     --depth int                  maximum depth to crawl, `0` for infinite (default: 1)
- -C, --concurrency int            number of concurrent inputs to process (default: 5)
- -P, --parallelism int            number of concurrent fetchers to use (default: 5)
-     --max-pages int              maximum pages to crawl per target, `0` for no limit (default: 0)
-     --crawl-duration duration    maximum duration per target crawl (e.g: 10s, 5m), `0` for no limit (default: 0)
+     --depth int                  maximum depth to crawl, `0` for infinite
+ -C, --concurrency int            number of concurrent inputs to process
+ -P, --parallelism int            number of concurrent fetchers to use
+     --max-pages int              maximum pages to crawl per target, `0` for no limit
+     --crawl-duration duration    maximum duration per target crawl (e.g: 10s, 5m), `0` for no limit
      --ignore-query bool          deduplicate URLs ignoring the query string
      --shape-dedup bool           deduplicate URLs by shape (numbers, UUIDs, dates normalized)
 
 HEADLESS:
      --headless bool              render pages in a headless browser, requires Chrome/Chromium
-     --headless-timeout int       time to wait for page rendering in seconds (default: 10)
+     --headless-timeout int       time to wait for page rendering in seconds
 
 OUTPUT:
      --jsonl bool                 output in JSONL(ines)
  -o, --output string              output write file path
  -O, --output-directory string    output write directory path
- -m, --monochrome bool            disable colored console output
- -s, --silent bool                disable logging output, only results
- -v, --verbose bool               enable detailed debug logging output
+ -m, --monochrome bool            stdout in monochrome
+ -s, --silent bool                stdout in silent mode
+ -v, --verbose bool               stdout in verbose mode
+
+```
+
+### Examples
+
+#### Basic
+
+Crawl a single URL:
+
+```bash
+xcrawl3r -u https://example.com
+```
+
+...or, a single domain:
+
+```bash
+xcrawl3r -u example.com
+```
+
+#### Multiple URLs
+
+Provide multiple URLs as a comma(,) separated value with `--url`:
+
+```bash
+xcrawl3r -u https://example.com,https://example.org
+```
+
+...or, repeat the `--url` flag:
+
+```bash
+xcrawl3r -u https://example.com -u https://example.org
+```
+
+...load them from a file with `--list`:
+
+```bash
+xcrawl3r -l urls.txt
+```
+
+...or, pipe them in through stdin:
+
+```bash
+cat urls.txt | xcrawl3r
+```
+
+#### Including subdomain URLs
+
+Match subdomains' URLs as well with `--include-subdomains`:
+
+```bash
+xcrawl3r -u https://www.example.com -d example.com --include-subdomains
+```
+
+#### With headless rendering
+
+Render pages in a headless browser to discover dynamically generated URLs:
+
+```bash
+xcrawl3r -u https://example.com --headless
+```
+
+#### Writing output to a file
+
+Write the results to a file with `--output`; add `--silent` to keep stdout free of log messages:
+
+```bash
+xcrawl3r -u https://example.com -s -o urls.txt
+```
+
+#### JSONL output
+
+Output the results as JSONL(ines) with `--jsonl`:
+
+```bash
+xcrawl3r -u https://example.com --jsonl
 ```
 
 ## Contributing

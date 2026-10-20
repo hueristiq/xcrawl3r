@@ -19,28 +19,32 @@ func (c *Crawler) collector(ctx context.Context, scope *scope, results chan<- Re
 	collector = colly.NewCollector(
 		colly.Async(true),
 		colly.IgnoreRobotsTxt(),
-		colly.MaxDepth(c.opts.depth),
+		colly.MaxDepth(c.cfg.Depth),
 		colly.StdlibContext(ctx),
 	)
 
 	if err = collector.Limit(&colly.LimitRule{
 		DomainGlob:  "*",
-		Parallelism: c.opts.parallelism,
-		Delay:       c.opts.delay,
-		RandomDelay: c.opts.randomDelay,
+		Parallelism: c.cfg.Parallelism,
+		Delay:       c.cfg.Delay,
+		RandomDelay: c.cfg.RandomDelay,
 	}); err != nil {
 		return
 	}
 
-	if c.opts.randomUserAgent {
+	if c.cfg.RandomUserAgent {
 		collector.OnRequest(func(request *colly.Request) {
 			request.Headers.Set(hqgohttpheader.UserAgent.String(), hqgohttpuseragent.Random())
 		})
+	} else if c.cfg.Client != nil && c.cfg.Client.UserAgent != "" {
+		collector.OnRequest(func(request *colly.Request) {
+			request.Headers.Set(hqgohttpheader.UserAgent.String(), c.cfg.Client.UserAgent)
+		})
 	}
 
-	if len(c.opts.headers) > 0 {
+	if len(c.cfg.Headers) > 0 {
 		collector.OnRequest(func(request *colly.Request) {
-			for _, entry := range c.opts.headers {
+			for _, entry := range c.cfg.Headers {
 				var splitEntry []string
 
 				switch {
@@ -62,41 +66,41 @@ func (c *Crawler) collector(ctx context.Context, scope *scope, results chan<- Re
 
 	extensions.Referer(collector)
 
-	HTTPTransport := &http.Transport{
+	httpTransport := &http.Transport{
 		DialContext: (&net.Dialer{
-			Timeout:   c.opts.timeout,
-			KeepAlive: c.opts.timeout,
+			Timeout:   c.cfg.Timeout,
+			KeepAlive: c.cfg.Timeout,
 		}).DialContext,
 		MaxIdleConns:        100,
 		MaxConnsPerHost:     1000,
-		IdleConnTimeout:     c.opts.timeout,
-		TLSHandshakeTimeout: c.opts.timeout,
+		IdleConnTimeout:     c.cfg.Timeout,
+		TLSHandshakeTimeout: c.cfg.Timeout,
 		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: c.opts.insecureSkipVerify, //nolint:gosec // user-controllable via WithInsecureSkipVerify/--insecure-skip-verify, default insecure.
+			InsecureSkipVerify: c.cfg.InsecureSkipVerify, //nolint:gosec // user-controllable via Configuration.InsecureSkipVerify/--insecure-skip-verify, default insecure.
 			Renegotiation:      tls.RenegotiateOnceAsClient,
 		},
 	}
 
-	HTTPClient := &http.Client{
+	httpClient := &http.Client{
 		Transport: &roundTripper{
-			base:              HTTPTransport,
-			retries:           c.opts.retries,
-			requestsPerMinute: c.opts.requestsPerMinute,
+			base:              httpTransport,
+			retries:           c.cfg.Retries,
+			requestsPerMinute: c.cfg.RequestsPerMinute,
 		},
-		Timeout: c.opts.timeout,
+		Timeout: c.cfg.Timeout,
 		CheckRedirect: func(request *http.Request, _ []*http.Request) (err error) {
 			return checkRedirect(ctx, results, scope, request)
 		},
 	}
 
 	// NOTE: Must come BEFORE .SetClient calls
-	collector.SetClient(HTTPClient)
+	collector.SetClient(httpClient)
 
 	// NOTE: Must come AFTER .SetClient calls
-	if len(c.opts.proxies) > 0 {
+	if len(c.cfg.Proxies) > 0 {
 		var rrps colly.ProxyFunc
 
-		rrps, err = proxy.RoundRobinProxySwitcher(c.opts.proxies...)
+		rrps, err = proxy.RoundRobinProxySwitcher(c.cfg.Proxies...)
 		if err != nil {
 			return
 		}

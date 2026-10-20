@@ -58,7 +58,7 @@ func (w *Writer) CreateFile(path string) (file *os.File, err error) {
 	return
 }
 
-func (w *Writer) Write(writer io.Writer, result xcrawl3r.Result) (err error) {
+func (w *Writer) Write(writer io.Writer, domain string, result xcrawl3r.Result) (err error) {
 	bw := w.bufferedWriter(writer)
 
 	switch w.format {
@@ -68,18 +68,44 @@ func (w *Writer) Write(writer io.Writer, result xcrawl3r.Result) (err error) {
 		}
 	case formatJSONL:
 		data := resultForJSONL{
+			Domain: domain,
 			URL:    result.Value,
 			Source: result.Source,
 			Via:    result.Via,
 		}
 
-		var dataJSONBytes []byte
+		encoder := json.NewEncoder(bw)
+		encoder.SetEscapeHTML(false)
 
-		if dataJSONBytes, err = json.Marshal(data); err != nil {
+		if err = encoder.Encode(data); err != nil {
 			return
 		}
+	}
 
-		if _, err = bw.Write(append(dataJSONBytes, '\n')); err != nil {
+	return
+}
+
+// WriteWithTechnique writes result to writer with its discovery technique
+// as a `[technique] ` prefix on the value line. JSONL output already
+// includes the source and via fields, so it is written verbatim.
+//
+// Parameters:
+//   - writer (io.Writer): the destination to write result to.
+//   - domain (string): the domain result was found for.
+//   - result (xcrawl3r.Result): the result to write.
+//
+// Returns:
+//   - err (error): non-nil when writing to writer fails.
+func (w *Writer) WriteWithTechnique(writer io.Writer, domain string, result xcrawl3r.Result) (err error) {
+	switch w.format {
+	case formatTXT:
+		bw := w.bufferedWriter(writer)
+
+		if _, err = bw.WriteString("[" + result.Via + "] " + result.Value + "\n"); err != nil {
+			return
+		}
+	case formatJSONL:
+		if err = w.Write(writer, domain, result); err != nil {
 			return
 		}
 	}
@@ -113,8 +139,9 @@ func (w *Writer) bufferedWriter(writer io.Writer) (bw *bufio.Writer) {
 type format string
 
 type resultForJSONL struct {
+	Domain string `json:"domain"`
 	URL    string `json:"url"`
-	Source string `json:"source,omitempty"`
+	Source string `json:"source"`
 	Via    string `json:"via,omitempty"`
 }
 
