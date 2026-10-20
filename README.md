@@ -168,36 +168,20 @@ CONFIGURATION:
  -c, --configuration string       (default: $HOME/.config/xcrawl3r/config.yaml)
 
 INPUT:
- -u, --url string[]               target URL
+     --url string[]               target URL
  -l, --list string                target URLs file path
 
  For multiple URLs, use comma(,) separated value with `--url`,
  specify multiple `--url`, load from file with `--list` or load from stdin.
 
 SCOPE:
- -d, --domain string[]            match domain(s) URLs
+ -d, --domain string[]            domain to match URLs for
 
  For multiple domains, use comma(,) separated value with `--domain`
  or specify multiple `--domain`.
-
-     --include-subdomains bool    with domain(s), match subdomains' URLs
-
  Without `--domain`, only URLs on the target's host are matched.
 
-REQUEST:
-     --delay int                  delay between each request in seconds
-     --random-delay int           random delay between each request in seconds
- -H, --header string[]            header to include in 'header:value' format
-
- For multiple headers, use comma(,) separated value with `--header`
- or specify multiple `--header`.
-
-     --timeout int                time to wait for request in seconds
-     --retries int                maximum attempts per request, `0` for no retries
-     --requests-per-minute int    maximum requests per minute, per host, `0` for no limit
-     --random-agent bool          use a random User-Agent for each request
-     --insecure-skip-verify bool  skip TLS certificate verification
-     --cookie string[]            cookie to include in 'name=value' format
+     --include-subdomains bool    match subdomain's URLs
 
 PROXY:
      --proxy string[]             proxy (e.g: http://127.0.0.1:8080)
@@ -206,17 +190,28 @@ PROXY:
  or specify multiple `--proxy`.
 
 OPTIMIZATION:
+     --delay int                  delay between each request in seconds
+     --random-delay int           random delay between each request in seconds
+ -H, --header string[]            header to include in 'header:value' format
+
+ For multiple headers, use comma(,) separated value with `--header`
+ or specify multiple `--header`.
+
+     --random-agent bool          use a random User-Agent for each request
+     --cookie string[]            cookie to include in 'name=value' format
+     --insecure-skip-verify bool  skip TLS certificate verification
+     --timeout int                time to wait for request in seconds
+     --retries int                maximum attempts per request, `0` for no retries
      --depth int                  maximum depth to crawl, `0` for infinite
+     --max-pages int              maximum pages to crawl per target, `0` for no limit
  -C, --concurrency int            number of concurrent inputs to process
  -P, --parallelism int            number of concurrent fetchers to use
-     --max-pages int              maximum pages to crawl per target, `0` for no limit
+     --requests-per-minute int    maximum requests per minute, per host, `0` for no limit
      --crawl-duration duration    maximum duration per target crawl (e.g: 10s, 5m), `0` for no limit
      --ignore-query bool          deduplicate URLs ignoring the query string
      --shape-dedup bool           deduplicate URLs by shape (numbers, UUIDs, dates normalized)
-
-RENDER:
-     --render bool                 render pages in a headless browser, requires Chrome/Chromium
-     --render-timeout int          time to wait for page rendering in seconds
+     --render bool                render pages in a headless browser, requires Chrome/Chromium
+     --render-timeout int         time to wait for page rendering in seconds
 
 OUTPUT:
      --jsonl bool                 output in JSONL(ines)
