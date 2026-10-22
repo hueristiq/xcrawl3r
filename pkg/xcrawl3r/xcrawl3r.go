@@ -2,12 +2,9 @@ package xcrawl3r
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"regexp"
-	"strings"
 	"sync"
-	"time"
 
 	"github.com/gocolly/colly/v2/storage"
 	hqgourlextractor "github.com/hueristiq/hq-lib-url-go/extractor"
@@ -71,26 +68,28 @@ func (c *Crawler) crawl(ctx context.Context, target string, results chan Result)
 		return
 	}
 
+	// Registered after close(results) so it runs before the channel closes on
+	// every return path, including cancellation.
+	defer collector.Wait()
+
 	c.registerHandlers(ctx, collector, scope, results)
 
-	for _, target := range c.targets(parsedTargetURL) {
+	for _, target := range c.targets(parsedTargetURL, scope) {
 		if ctx.Err() != nil {
 			return
 		}
 
-		c.visit(ctx, target, results, scope, func() error {
+		c.visit(ctx, target, results, func() error {
 			return collector.Visit(target)
 		})
 	}
-
-	collector.Wait()
 }
 
-func (c *Crawler) targets(parsedTargetURL *hqgourlparser.URL) (targets []string) {
+func (c *Crawler) targets(parsedTargetURL *hqgourlparser.URL, scope *scope) (targets []string) {
 	targets = []string{parsedTargetURL.String()}
 
-	if strings.Contains(parsedTargetURL.String(), ".min.") {
-		targets = append(targets, strings.ReplaceAll(parsedTargetURL.String(), ".min.", "."))
+	if companion, ok := minifiedCompanion(parsedTargetURL.String()); ok && scope.allows(companion) {
+		targets = append(targets, companion)
 	}
 
 	robotsTXTURL := fmt.Sprintf("%s://%s/robots.txt", parsedTargetURL.Scheme, parsedTargetURL.Host)
@@ -104,61 +103,6 @@ func (c *Crawler) targets(parsedTargetURL *hqgourlparser.URL) (targets []string)
 	}
 
 	return
-}
-
-type ClientConfiguration struct {
-	UserAgent string
-}
-
-type Configuration struct {
-	Client             *ClientConfiguration
-	Domains            []string
-	IncludeSubdomains  bool
-	Delay              time.Duration
-	RandomDelay        time.Duration
-	Timeout            time.Duration
-	Retries            int
-	RequestsPerMinute  int
-	RandomUserAgent    bool
-	InsecureSkipVerify bool
-	Headers            []string
-	Proxies            []string
-	Depth              int
-	Parallelism        int
-	MaxPages           int
-	CrawlDuration      time.Duration
-	IgnoreQuery        bool
-	ShapeDedup         bool
-	Render             bool
-	RenderTimeout      time.Duration
-}
-
-func (cfg *Configuration) validate() (err error) {
-	switch {
-	case cfg.Timeout <= 0:
-		return errors.New("timeout must be greater than 0")
-	case cfg.Parallelism < 1:
-		return errors.New("parallelism must be at least 1")
-	case cfg.Depth < 0:
-		return errors.New("depth must be 0 or greater")
-	case cfg.MaxPages < 0:
-		return errors.New("max pages must be 0 or greater")
-	}
-
-	return
-}
-
-var up = hqgourlparser.New(hqgourlparser.WithDefaultScheme("https"))
-
-var sitemapPaths = []string{
-	"/sitemap.xml",
-	"/sitemap.xml.gz",
-	"/sitemap_news.xml",
-	"/sitemap_index.xml",
-	"/sitemap-index.xml",
-	"/sitemapindex.xml",
-	"/sitemap-news.xml",
-	"/wp-sitemap.xml",
 }
 
 // New returns a crawler configured with cfg. Every crawler owns fresh
@@ -203,8 +147,15 @@ func New(cfg *Configuration) (crawler *Crawler, err error) {
 			timeout = defaultRenderTimeout
 		}
 
+		settle := cfg.RenderSettle
+		if settle <= 0 {
+			settle = defaultRenderSettle
+		}
+
 		crawler.renderer = &renderer{
+			cfg:     cfg,
 			timeout: timeout,
+			settle:  settle,
 		}
 	}
 

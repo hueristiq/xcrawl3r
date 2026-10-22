@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/http/cookiejar"
 	"strings"
 
 	"github.com/gocolly/colly/v2"
@@ -81,6 +82,20 @@ func (c *Crawler) collector(ctx context.Context, scope *scope, results chan<- Re
 		},
 	}
 
+	// Assign the proxy to the transport rather than calling
+	// collector.SetProxyFunc: colly replaces the client's transport when the
+	// proxy function is set, dropping retries, rate limiting, and TLS options.
+	if len(c.cfg.Proxies) > 0 {
+		var proxyFunc colly.ProxyFunc
+
+		proxyFunc, err = proxy.RoundRobinProxySwitcher(c.cfg.Proxies...)
+		if err != nil {
+			return
+		}
+
+		httpTransport.Proxy = proxyFunc
+	}
+
 	httpClient := &http.Client{
 		Transport: &roundTripper{
 			base:              httpTransport,
@@ -93,20 +108,13 @@ func (c *Crawler) collector(ctx context.Context, scope *scope, results chan<- Re
 		},
 	}
 
+	httpClient.Jar, err = cookiejar.New(nil)
+	if err != nil {
+		return
+	}
+
 	// NOTE: Must come BEFORE .SetClient calls
 	collector.SetClient(httpClient)
-
-	// NOTE: Must come AFTER .SetClient calls
-	if len(c.cfg.Proxies) > 0 {
-		var rrps colly.ProxyFunc
-
-		rrps, err = proxy.RoundRobinProxySwitcher(c.cfg.Proxies...)
-		if err != nil {
-			return
-		}
-
-		collector.SetProxyFunc(rrps)
-	}
 
 	if err = collector.SetStorage(c.storage); err != nil {
 		return
@@ -120,11 +128,13 @@ func checkRedirect(ctx context.Context, results chan<- Result, scope *scope, req
 		return
 	}
 
-	if !scope.registrableAllows(request.URL.String()) {
+	// Redirects to a sibling subdomain are followed only when subdomains are
+	// explicitly in scope. Everything else keeps the last in-scope response.
+	if !scope.includeSubdomains || !scope.registrableAllows(request.URL.String()) {
 		return http.ErrUseLastResponse
 	}
 
-	host := strings.ToLower(request.URL.Hostname())
+	host := toASCIIHost(request.URL.Hostname())
 
 	if scope.widen(host) {
 		emit(ctx, results, Result{

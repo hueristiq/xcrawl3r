@@ -5,7 +5,7 @@ before:
 builds:
     -
         id: xcrawl3r-cli
-        main: cmd/xcrawl3r/main.go
+        main: ./cmd/xcrawl3r
         binary: xcrawl3r
 
         env:

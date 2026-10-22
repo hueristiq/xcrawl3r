@@ -3,47 +3,48 @@ package configuration
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"reflect"
 
-	"dario.cat/mergo"
 	"gopkg.in/yaml.v3"
 )
 
 type Request struct {
-	Delay              int      `yaml:"delay"`
-	RandomDelay        int      `yaml:"random_delay"`
-	Headers            []string `yaml:"headers"`
-	Cookies            []string `yaml:"cookies"`
-	Timeout            int      `yaml:"timeout"`
-	Retries            int      `yaml:"retries"`
-	RequestsPerMinute  int      `yaml:"requests_per_minute"`
-	RandomAgent        bool     `yaml:"random_agent"`
-	InsecureSkipVerify bool     `yaml:"insecure_skip_verify"`
+	Delay              int      `mapstructure:"delay"                yaml:"delay"`
+	RandomDelay        int      `mapstructure:"random_delay"         yaml:"random_delay"`
+	Headers            []string `mapstructure:"headers"              yaml:"headers"`
+	Cookies            []string `mapstructure:"cookies"              yaml:"cookies"`
+	Timeout            int      `mapstructure:"timeout"              yaml:"timeout"`
+	Retries            int      `mapstructure:"retries"              yaml:"retries"`
+	RequestsPerMinute  int      `mapstructure:"requests_per_minute"  yaml:"requests_per_minute"`
+	RandomAgent        bool     `mapstructure:"random_agent"         yaml:"random_agent"`
+	InsecureSkipVerify bool     `mapstructure:"insecure_skip_verify" yaml:"insecure_skip_verify"`
 }
 
 type Optimization struct {
-	Depth         int    `yaml:"depth"`
-	Concurrency   int    `yaml:"concurrency"`
-	Parallelism   int    `yaml:"parallelism"`
-	MaxPages      int    `yaml:"max_pages"`
-	CrawlDuration string `yaml:"crawl_duration"`
-	IgnoreQuery   bool   `yaml:"ignore_query"`
-	ShapeDedup    bool   `yaml:"shape_dedup"`
+	Depth         int    `mapstructure:"depth"          yaml:"depth"`
+	Concurrency   int    `mapstructure:"concurrency"    yaml:"concurrency"`
+	Parallelism   int    `mapstructure:"parallelism"    yaml:"parallelism"`
+	MaxPages      int    `mapstructure:"max_pages"      yaml:"max_pages"`
+	CrawlDuration string `mapstructure:"crawl_duration" yaml:"crawl_duration"`
+	IgnoreQuery   bool   `mapstructure:"ignore_query"   yaml:"ignore_query"`
+	ShapeDedup    bool   `mapstructure:"shape_dedup"    yaml:"shape_dedup"`
 }
 
 type Render struct {
-	Enabled bool `yaml:"enabled"`
-	Timeout int  `yaml:"timeout"`
+	Enabled bool `mapstructure:"enabled" yaml:"enabled"`
+	Timeout int  `mapstructure:"timeout" yaml:"timeout"`
+	Settle  int  `mapstructure:"settle"  yaml:"settle"`
 }
 
 type Configuration struct {
-	Version      string       `yaml:"version"`
-	Request      Request      `yaml:"request"`
-	Proxies      []string     `yaml:"proxies"`
-	Optimization Optimization `yaml:"optimization"`
-	Render       Render       `yaml:"render"`
+	Version      string       `mapstructure:"version"      yaml:"version"`
+	Request      Request      `mapstructure:"request"      yaml:"request"`
+	Proxies      []string     `mapstructure:"proxies"      yaml:"proxies"`
+	Optimization Optimization `mapstructure:"optimization" yaml:"optimization"`
+	Render       Render       `mapstructure:"render"       yaml:"render"`
 }
 
 func (cfg *Configuration) Write(path string) (err error) {
@@ -60,16 +61,23 @@ func (cfg *Configuration) Write(path string) (err error) {
 
 	var file *os.File
 
-	file, err = os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600) //nolint:gosec // path is the user-specified configuration file location.
+	file, err = os.CreateTemp(directory, "."+filepath.Base(path)+".tmp-*")
 	if err != nil {
 		return
 	}
 
+	tempPath := file.Name()
+
 	defer func() {
-		if closeErr := file.Close(); err == nil && closeErr != nil {
-			err = closeErr
+		if err != nil {
+			_ = file.Close()
+			_ = os.Remove(tempPath)
 		}
 	}()
+
+	if err = file.Chmod(0o600); err != nil {
+		return
+	}
 
 	enc := yaml.NewEncoder(file)
 
@@ -80,6 +88,14 @@ func (cfg *Configuration) Write(path string) (err error) {
 	}
 
 	if err = enc.Close(); err != nil {
+		return
+	}
+
+	if err = file.Close(); err != nil {
+		return
+	}
+
+	if err = os.Rename(tempPath, path); err != nil {
 		return
 	}
 
@@ -128,35 +144,44 @@ var DefaultConfiguration = Configuration{
 	Request: Request{
 		Timeout:            10,
 		Retries:            3,
-		InsecureSkipVerify: true,
+		InsecureSkipVerify: false,
 	},
 	Proxies: []string{},
 	Optimization: Optimization{
-		Depth:       1,
+		Depth:       2,
 		Concurrency: 5,
 		Parallelism: 5,
 	},
 	Render: Render{
 		Timeout: 10,
+		Settle:  1,
 	},
 }
 
-// booleanPreserver keeps mergo from treating an explicit `false` in the
-// user's configuration as an unset field to overwrite with a default.
-type booleanPreserver struct{}
-
-func (booleanPreserver) Transformer(typ reflect.Type) func(dst, src reflect.Value) error {
-	if typ.Kind() == reflect.Bool {
-		return func(dst, src reflect.Value) error {
-			return nil
-		}
-	}
-
-	return nil
+var defaultKeys = []string{
+	"request.delay",
+	"request.random_delay",
+	"request.timeout",
+	"request.retries",
+	"request.requests_per_minute",
+	"request.random_agent",
+	"request.insecure_skip_verify",
+	"optimization.depth",
+	"optimization.concurrency",
+	"optimization.parallelism",
+	"optimization.max_pages",
+	"optimization.crawl_duration",
+	"optimization.ignore_query",
+	"optimization.shape_dedup",
+	"render.enabled",
+	"render.timeout",
+	"render.settle",
 }
 
 func CreateOrUpdate(path string) (err error) {
 	var cfg Configuration
+
+	var present map[string]bool
 
 	_, err = os.Stat(path)
 
@@ -170,15 +195,13 @@ func CreateOrUpdate(path string) (err error) {
 	case err != nil:
 		return
 	default:
-		cfg, err = Read(path)
+		cfg, present, err = readWithPresence(path)
 		if err != nil {
 			return
 		}
 
-		if cfg.Version != Version || hasMissingDefaults(&cfg) {
-			if err = mergo.Merge(&cfg, DefaultConfiguration, mergo.WithTransformers(booleanPreserver{})); err != nil {
-				return
-			}
+		if cfg.Version != Version || hasMissingDefaults(present) {
+			applyDefaults(&cfg, present)
 
 			cfg.Version = Version
 
@@ -191,35 +214,55 @@ func CreateOrUpdate(path string) (err error) {
 	return
 }
 
-func hasMissingDefaults(cfg *Configuration) (missing bool) {
-	if cfg.Request.Timeout == 0 {
-		return true
-	}
-
-	if cfg.Request.Retries == 0 {
-		return true
-	}
-
-	if cfg.Optimization.Depth == 0 {
-		return true
-	}
-
-	if cfg.Optimization.Concurrency == 0 {
-		return true
-	}
-
-	if cfg.Optimization.Parallelism == 0 {
-		return true
-	}
-
-	if cfg.Render.Timeout == 0 {
-		return true
+func hasMissingDefaults(present map[string]bool) (missing bool) {
+	for _, key := range defaultKeys {
+		if !present[key] {
+			return true
+		}
 	}
 
 	return
 }
 
 func Read(path string) (cfg Configuration, err error) {
+	cfg, _, err = readWithPresence(path)
+
+	return
+}
+
+func applyDefaults(cfg *Configuration, present map[string]bool) {
+	applyDefaultValues(reflect.ValueOf(cfg).Elem(), reflect.ValueOf(DefaultConfiguration), "", present)
+}
+
+func applyDefaultValues(dst, defaults reflect.Value, prefix string, present map[string]bool) {
+	typ := dst.Type()
+
+	for index := range typ.NumField() {
+		field := typ.Field(index)
+		key := field.Tag.Get("mapstructure")
+
+		if key == "" {
+			continue
+		}
+
+		fullKey := key
+		if prefix != "" {
+			fullKey = prefix + "." + key
+		}
+
+		if !present[fullKey] {
+			dst.Field(index).Set(defaults.Field(index))
+
+			continue
+		}
+
+		if field.Type.Kind() == reflect.Struct {
+			applyDefaultValues(dst.Field(index), defaults.Field(index), fullKey, present)
+		}
+	}
+}
+
+func readWithPresence(path string) (cfg Configuration, present map[string]bool, err error) {
 	file, err := os.Open(path) //nolint:gosec // path is the user-specified configuration file location.
 	if err != nil {
 		return
@@ -231,9 +274,50 @@ func Read(path string) (cfg Configuration, err error) {
 		}
 	}()
 
-	if err = yaml.NewDecoder(file).Decode(&cfg); err != nil {
+	var raw map[string]any
+
+	if err = yaml.NewDecoder(file).Decode(&raw); err != nil {
+		if !errors.Is(err, io.EOF) {
+			return
+		}
+
+		err = nil
+		raw = nil
+	}
+
+	if _, err = file.Seek(0, io.SeekStart); err != nil {
 		return
 	}
 
+	if err = yaml.NewDecoder(file).Decode(&cfg); err != nil {
+		if !errors.Is(err, io.EOF) {
+			return
+		}
+
+		err = nil
+	}
+
+	present = make(map[string]bool)
+
+	collectPresence("", raw, present)
+
 	return
+}
+
+func collectPresence(prefix string, raw map[string]any, present map[string]bool) {
+	for key, value := range raw {
+		fullKey := key
+		if prefix != "" {
+			fullKey = prefix + "." + key
+		}
+
+		present[fullKey] = true
+
+		nested, ok := value.(map[string]any)
+		if !ok {
+			continue
+		}
+
+		collectPresence(fullKey, nested, present)
+	}
 }

@@ -3,7 +3,7 @@ module github.com/hueristiq/xcrawl3r
 go 1.26.3
 
 require (
-	dario.cat/mergo v1.0.2
+	github.com/chromedp/cdproto v0.158.3
 	github.com/chromedp/chromedp v0.21.0
 	github.com/gocolly/colly/v2 v2.3.0
 	github.com/hueristiq/hq-lib-http-go v0.0.0-20261011140034-f591e873d968
@@ -24,7 +24,6 @@ require (
 	github.com/antchfx/xmlquery v1.5.2 // indirect
 	github.com/antchfx/xpath v1.3.9 // indirect
 	github.com/bits-and-blooms/bitset v1.26.0 // indirect
-	github.com/chromedp/cdproto v0.158.3 // indirect
 	github.com/fsnotify/fsnotify v1.10.1 // indirect
 	github.com/go-json-experiment/json v0.0.0-20260820222146-c27c302e5fc3 // indirect
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect

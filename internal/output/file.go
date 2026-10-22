@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/hueristiq/xcrawl3r/pkg/xcrawl3r"
 )
@@ -27,7 +28,7 @@ func (w *Writer) CreateFile(path string) (file *os.File, err error) {
 		return
 	}
 
-	extension := filepath.Ext(path)
+	extension := strings.ToLower(filepath.Ext(path))
 
 	switch w.format {
 	case formatTXT:
@@ -35,7 +36,7 @@ func (w *Writer) CreateFile(path string) (file *os.File, err error) {
 			path += ".txt"
 		}
 	case formatJSONL:
-		if extension != ".json" {
+		if extension != ".json" && extension != ".jsonl" {
 			path += ".json"
 		}
 	}
@@ -85,17 +86,6 @@ func (w *Writer) Write(writer io.Writer, domain string, result xcrawl3r.Result) 
 	return
 }
 
-// WriteWithTechnique writes result to writer with its discovery technique
-// as a `[technique] ` prefix on the value line. JSONL output already
-// includes the source and via fields, so it is written verbatim.
-//
-// Parameters:
-//   - writer (io.Writer): the destination to write result to.
-//   - domain (string): the domain result was found for.
-//   - result (xcrawl3r.Result): the result to write.
-//
-// Returns:
-//   - err (error): non-nil when writing to writer fails.
 func (w *Writer) WriteWithTechnique(writer io.Writer, domain string, result xcrawl3r.Result) (err error) {
 	switch w.format {
 	case formatTXT:
@@ -122,6 +112,19 @@ func (w *Writer) Flush(writer io.Writer) (err error) {
 	if err = bw.Flush(); err != nil {
 		return
 	}
+
+	return
+}
+
+func (w *Writer) Release(writer io.Writer) (err error) {
+	bw, ok := w.writers[writer]
+	if !ok {
+		return
+	}
+
+	err = bw.Flush()
+
+	delete(w.writers, writer)
 
 	return
 }

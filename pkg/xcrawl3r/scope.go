@@ -29,10 +29,10 @@ func (c *Crawler) scopeFor(parsedTargetURL *hqgourlparser.URL) (s *scope) {
 		s.domains = make([]string, 0, len(c.cfg.Domains))
 
 		for _, domain := range c.cfg.Domains {
-			s.domains = append(s.domains, strings.ToLower(domain))
+			s.domains = append(s.domains, toASCIIHost(domain))
 		}
 	} else {
-		s.domains = []string{strings.ToLower(parsedTargetURL.Hostname())}
+		s.domains = []string{toASCIIHost(parsedTargetURL.Hostname())}
 	}
 
 	return
@@ -45,12 +45,12 @@ func (s *scope) allows(rawURL string) (allowed bool) {
 	}
 
 	switch parsedURL.Scheme {
-	case "http", "https":
+	case schemeHTTP, schemeHTTPS:
 	default:
 		return
 	}
 
-	host := strings.ToLower(parsedURL.Hostname())
+	host := toASCIIHost(parsedURL.Hostname())
 
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -74,7 +74,7 @@ func (s *scope) registrableAllows(rawURL string) (allowed bool) {
 		return
 	}
 
-	registrable, err := publicsuffix.EffectiveTLDPlusOne(strings.ToLower(parsedURL.Hostname()))
+	registrable, err := publicsuffix.EffectiveTLDPlusOne(toASCIIHost(parsedURL.Hostname()))
 	if err != nil {
 		return
 	}
@@ -97,7 +97,7 @@ func (s *scope) registrableAllows(rawURL string) (allowed bool) {
 }
 
 func (s *scope) widen(host string) (widened bool) {
-	host = strings.ToLower(host)
+	host = toASCIIHost(host)
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -111,4 +111,14 @@ func (s *scope) widen(host string) (widened bool) {
 	s.domains = append(s.domains, host)
 
 	return true
+}
+
+// chargePage records one crawled HTML page against the page budget. It reports
+// false once the budget is exhausted.
+func (s *scope) chargePage() (allowed bool) {
+	if s.maxPages <= 0 {
+		return true
+	}
+
+	return s.requestCount.Add(1) <= uint32(s.maxPages) //nolint:gosec // maxPages validated >= 0 in New(); the > 0 guard here covers the rest.
 }

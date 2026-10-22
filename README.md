@@ -168,11 +168,11 @@ CONFIGURATION:
  -c, --configuration string       (default: $HOME/.config/xcrawl3r/config.yaml)
 
 INPUT:
-     --url string[]               target URL
+ -u, --url string[]               target URL
  -l, --list string                target URLs file path
 
- For multiple URLs, use comma(,) separated value with `--url`,
- specify multiple `--url`, load from file with `--list` or load from stdin.
+ For multiple URLs, specify multiple `--url`, load from file with
+ `--list` or load from stdin.
 
 SCOPE:
  -d, --domain string[]            domain to match URLs for
@@ -186,24 +186,22 @@ SCOPE:
 PROXY:
      --proxy string[]             proxy (e.g: http://127.0.0.1:8080)
 
- For multiple proxies, use comma(,) separated value with `--proxy`
- or specify multiple `--proxy`.
+ For multiple proxies, specify multiple `--proxy`.
 
 OPTIMIZATION:
      --delay int                  delay between each request in seconds
      --random-delay int           random delay between each request in seconds
  -H, --header string[]            header to include in 'header:value' format
 
- For multiple headers, use comma(,) separated value with `--header`
- or specify multiple `--header`.
+ For multiple headers, specify multiple `--header`.
 
      --random-agent bool          use a random User-Agent for each request
      --cookie string[]            cookie to include in 'name=value' format
      --insecure-skip-verify bool  skip TLS certificate verification
      --timeout int                time to wait for request in seconds
      --retries int                maximum attempts per request, `0` for no retries
-     --depth int                  maximum depth to crawl, `0` for infinite
-     --max-pages int              maximum pages to crawl per target, `0` for no limit
+     --depth int                  maximum crawl depth, `0` for infinite (the seed is level 1; default 2)
+     --max-pages int              maximum HTML pages to crawl per target, `0` for no limit
  -C, --concurrency int            number of concurrent inputs to process
  -P, --parallelism int            number of concurrent fetchers to use
      --requests-per-minute int    maximum requests per minute, per host, `0` for no limit
@@ -211,7 +209,8 @@ OPTIMIZATION:
      --ignore-query bool          deduplicate URLs ignoring the query string
      --shape-dedup bool           deduplicate URLs by shape (numbers, UUIDs, dates normalized)
      --render bool                render pages in a headless browser, requires Chrome/Chromium
-     --render-timeout int         time to wait for page rendering in seconds
+     --render-timeout int         hard cap on page rendering time in seconds
+     --render-settle int          time to wait after page load for JavaScript to settle in seconds, capped by --render-timeout (default 1)
 
 OUTPUT:
      --jsonl bool                 output in JSONL(ines)
@@ -241,13 +240,7 @@ xcrawl3r -u example.com
 
 #### Multiple URLs
 
-Provide multiple URLs as a comma(,) separated value with `--url`:
-
-```bash
-xcrawl3r -u https://example.com,https://example.org
-```
-
-...or, repeat the `--url` flag:
+Provide multiple URLs by repeating `--url`:
 
 ```bash
 xcrawl3r -u https://example.com -u https://example.org
