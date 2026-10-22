@@ -319,6 +319,12 @@ func main() {
 		outputs = append(outputs, file)
 	}
 
+	hqgologger.Info("Crawling...", hqgologger.WithoutTimestamp())
+
+	if !silent {
+		hqgologger.Print("", hqgologger.WithoutTimestamp(), hqgologger.WithoutLabel())
+	}
+
 	if concurrency < 1 {
 		concurrency = 1
 	}
