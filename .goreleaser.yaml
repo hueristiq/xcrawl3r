@@ -5,7 +5,7 @@ before:
 builds:
     -
         id: xcrawl3r-cli
-        main: cmd/xcrawl3r/main.go
+        main: ./cmd/xcrawl3r
         binary: xcrawl3r
 
         env:
@@ -33,6 +33,11 @@ builds:
 
         flags:
             - -trimpath
+        ldflags:
+            - -s -w -X github.com/hueristiq/xcrawl3r/internal/configuration.Version=v{{.Version}}-{{ if .Branch }}{{ .Branch }}{{ else }}main{{ end }}-{{.ShortCommit}}
+
+snapshot:
+    version_template: "{{ .Tag }}-next"
 
 archives:
     -

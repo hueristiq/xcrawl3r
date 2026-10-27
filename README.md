@@ -1,8 +1,8 @@
 # xcrawl3r
 
-![made with go](https://img.shields.io/badge/made%20with-Go-1E90FF.svg) [![go report card](https://goreportcard.com/badge/github.com/hueristiq/xcrawl3r)](https://goreportcard.com/report/github.com/hueristiq/xcrawl3r) [![release](https://img.shields.io/github/release/hueristiq/xcrawl3r?style=flat&color=1E90FF)](https://github.com/hueristiq/xcrawl3r/releases) [![open issues](https://img.shields.io/github/issues-raw/hueristiq/xcrawl3r.svg?style=flat&color=1E90FF)](https://github.com/hueristiq/xcrawl3r/issues?q=is:issue+is:open) [![closed issues](https://img.shields.io/github/issues-closed-raw/hueristiq/xcrawl3r.svg?style=flat&color=1E90FF)](https://github.com/hueristiq/xcrawl3r/issues?q=is:issue+is:closed) [![license](https://img.shields.io/badge/license-MIT-gray.svg?color=1E90FF)](https://github.com/hueristiq/xcrawl3r/blob/master/LICENSE) ![maintenance](https://img.shields.io/badge/maintained%3F-yes-1E90FF.svg) [![contribution](https://img.shields.io/badge/contributions-welcome-1E90FF.svg)](https://github.com/hueristiq/xcrawl3r/blob/master/CONTRIBUTING.md)
+![made with go](https://img.shields.io/badge/made%20with-Go-1E90FF.svg) [![go report card](https://goreportcard.com/badge/github.com/hueristiq/xcrawl3r)](https://goreportcard.com/report/github.com/hueristiq/xcrawl3r) [![release](https://img.shields.io/github/release/hueristiq/xcrawl3r?style=flat&color=1E90FF)](https://github.com/hueristiq/xcrawl3r/releases) [![open issues](https://img.shields.io/github/issues-raw/hueristiq/xcrawl3r.svg?style=flat&color=1E90FF)](https://github.com/hueristiq/xcrawl3r/issues?q=is:issue+is:open) [![closed issues](https://img.shields.io/github/issues-closed-raw/hueristiq/xcrawl3r.svg?style=flat&color=1E90FF)](https://github.com/hueristiq/xcrawl3r/issues?q=is:issue+is:closed) [![license](https://img.shields.io/badge/license-MIT-gray.svg?color=1E90FF)](https://github.com/hueristiq/xcrawl3r/blob/main/LICENSE) ![maintenance](https://img.shields.io/badge/maintained%3F-yes-1E90FF.svg) [![contribution](https://img.shields.io/badge/contributions-welcome-1E90FF.svg)](https://github.com/hueristiq/xcrawl3r/blob/main/CONTRIBUTING.md)
 
-`xcrawl3r` is a command-line utility designed to recursively spider webpages for URLs. It works by actively traversing websites - following links embedded in webpages, and parsing files (including sitemaps & robots.txt) - to uncover every URL.
+`xcrawl3r` is a command-line tool for recursively spidering webpages for URLs. It works by actively traversing websites, following links embedded in webpages, and parsing files (including sitemaps & robots.txt), to uncover every URL.
 
 Unlike [`xurlfind3r`](https://github.com/hueristiq/xurlfind3r/) that doesn't interact directly with the target, `xcrawl3r` interacts directly with the target by spidering its pages in real time. This active approach allows it to discover URLs that may be hidden or unindexed, providing a complete picture of the website’s navigational flow and content distribution. This makes `xcrawl3r` a powerful tool for security researchers, IT professionals, and anyone looking to gain insights into the URLs associated with websites.
 
@@ -17,6 +17,13 @@ Unlike [`xurlfind3r`](https://github.com/hueristiq/xurlfind3r/) that doesn't int
 	- [Install on Docker (With Docker Installed)](#install-on-docker-with-docker-installed)
 - [Post Installation](#post-installation)
 - [Usage](#usage)
+	- [Examples](#examples)
+		- [Basic](#basic)
+		- [Multiple URLs](#multiple-urls)
+		- [Including subdomain URLs](#including-subdomain-urls)
+		- [With JS rendering](#with-js-rendering)
+		- [Writing output to a file](#writing-output-to-a-file)
+		- [JSONL output](#jsonl-output)
 - [Contributing](#contributing)
 - [Licensing](#licensing)
 
@@ -53,7 +60,7 @@ tar xf xcrawl3r-<version>-linux-amd64.tar.gz
 ```
 
 > [!TIP]
-> The above steps, download and extract, can be combined into a single step with this onliner
+> The above steps, download and extract, can be combined into a single step with this one-liner
 > 
 > ```bash
 > curl -sL https://github.com/hueristiq/xcrawl3r/releases/download/v<version>/xcrawl3r-<version>-linux-amd64.tar.gz | tar -xzv
@@ -146,12 +153,13 @@ Here's what the help message looks like:
 
 ```text
 
-                             _ _____
-__  _____ _ __ __ ___      _| |___ / _ __
-\ \/ / __| '__/ _` \ \ /\ / / | |_ \| '__|
- >  < (__| | | (_| |\ V  V /| |___) | |
-/_/\_\___|_|  \__,_| \_/\_/ |_|____/|_|
-                                    v1.2.0
+                                           _ _____
+              __  _____ _ __ __ ___      _| |___ / _ __
+              \ \/ / __| '__/ _` \ \ /\ / / | |_ \| '__|
+               >  < (__| | | (_| |\ V  V /| |___) | |
+              /_/\_\___|_|  \__,_| \_/\_/ |_|____/|_| v0.0.0-branch-00000000
+
+                 Hueristiq Limited <hueristiq.com>
 
 USAGE:
  xcrawl3r [OPTIONS]
@@ -163,52 +171,128 @@ INPUT:
  -u, --url string[]               target URL
  -l, --list string                target URLs file path
 
- For multiple URLs, use comma(,) separated value with `--url`,
- specify multiple `--url`, load from file with `--list` or load from stdin.
+ For multiple URLs, specify multiple `--url`, load from file with
+ `--list` or load from stdin.
 
 SCOPE:
- -d, --domain string[]            match domain(s)  URLs
+ -d, --domain string[]            domain to match URLs for
 
  For multiple domains, use comma(,) separated value with `--domain`
  or specify multiple `--domain`.
+ Without `--domain`, only URLs on the target's host are matched.
 
-     --include-subdomains bool    with domain(s), match subdomains' URLs
-
-REQUEST:
-     --delay int                  delay between each request in seconds
- -H, --header string[]            header to include in 'header:value' format
-
- For multiple headers, use comma(,) separated value with `--header`
- or specify multiple `--header`.
-
-     --timeout int                time to wait for request in seconds (default: 10)
+     --include-subdomains bool    match subdomain's URLs
 
 PROXY:
- -p, --proxy string[]             Proxy (e.g: http://127.0.0.1:8080)
+     --proxy string[]             proxy (e.g: http://127.0.0.1:8080)
 
- For multiple proxies use comma(,) separated value with `--proxy`
- or specify multiple `--proxy`.
+ For multiple proxies, specify multiple `--proxy`.
 
 OPTIMIZATION:
-     --depth int                  maximum depth to crawl, `0` for infinite (default: 1)
- -C, --concurrency int            number of concurrent inputs to process (default: 5)
- -P, --parallelism int            number of concurrent fetchers to use (default: 5)
+     --delay int                  delay between each request in seconds
+     --random-delay int           random delay between each request in seconds
+ -H, --header string[]            header to include in 'header:value' format
 
-DEBUG:
-     --debug bool                 enable debug mode
+ For multiple headers, specify multiple `--header`.
+
+     --random-agent bool          use a random User-Agent for each request
+     --cookie string[]            cookie to include in 'name=value' format
+     --insecure-skip-verify bool  skip TLS certificate verification
+     --timeout int                time to wait for request in seconds
+     --retries int                maximum attempts per request, `0` for no retries
+     --depth int                  maximum crawl depth, `0` for infinite (the seed is level 1; default 2)
+     --max-pages int              maximum HTML pages to crawl per target, `0` for no limit
+ -C, --concurrency int            number of concurrent inputs to process
+ -P, --parallelism int            number of concurrent fetchers to use
+     --requests-per-minute int    maximum requests per minute, per host, `0` for no limit
+     --crawl-duration duration    maximum duration per target crawl (e.g: 10s, 5m), `0` for no limit
+     --ignore-query bool          deduplicate URLs ignoring the query string
+     --shape-dedup bool           deduplicate URLs by shape (numbers, UUIDs, dates normalized)
+     --render bool                render pages in a headless browser, requires Chrome/Chromium
+     --render-timeout int         hard cap on page rendering time in seconds
+     --render-settle int          time to wait after page load for JavaScript to settle in seconds, capped by --render-timeout (default 1)
 
 OUTPUT:
      --jsonl bool                 output in JSONL(ines)
  -o, --output string              output write file path
+ -O, --output-directory string    output write directory path
  -m, --monochrome bool            stdout in monochrome
  -s, --silent bool                stdout in silent mode
  -v, --verbose bool               stdout in verbose mode
 
 ```
 
+### Examples
+
+#### Basic
+
+Crawl a single URL:
+
+```bash
+xcrawl3r -u https://example.com
+```
+
+...or, a single domain:
+
+```bash
+xcrawl3r -u example.com
+```
+
+#### Multiple URLs
+
+Provide multiple URLs by repeating `--url`:
+
+```bash
+xcrawl3r -u https://example.com -u https://example.org
+```
+
+...load them from a file with `--list`:
+
+```bash
+xcrawl3r -l urls.txt
+```
+
+...or, pipe them in through stdin:
+
+```bash
+cat urls.txt | xcrawl3r
+```
+
+#### Including subdomain URLs
+
+Match subdomains' URLs as well with `--include-subdomains`:
+
+```bash
+xcrawl3r -u https://www.example.com -d example.com --include-subdomains
+```
+
+#### With JS rendering
+
+Render pages in a headless browser to discover dynamically generated URLs:
+
+```bash
+xcrawl3r -u https://example.com --render
+```
+
+#### Writing output to a file
+
+Write the results to a file with `--output`; add `--silent` to keep stdout free of log messages:
+
+```bash
+xcrawl3r -u https://example.com -s -o urls.txt
+```
+
+#### JSONL output
+
+Output the results as JSONL(ines) with `--jsonl`:
+
+```bash
+xcrawl3r -u https://example.com --jsonl
+```
+
 ## Contributing
 
-Contributions are welcome and encouraged! Feel free to submit [Pull Requests](https://github.com/hueristiq/xcrawl3r/pulls) or report [Issues](https://github.com/hueristiq/xcrawl3r/issues). For more details, check out the [contribution guidelines](https://github.com/hueristiq/xcrawl3r/blob/master/CONTRIBUTING.md).
+Contributions are welcome and encouraged! Feel free to submit [Pull Requests](https://github.com/hueristiq/xcrawl3r/pulls) or report [Issues](https://github.com/hueristiq/xcrawl3r/issues). For more details, check out the [contribution guidelines](https://github.com/hueristiq/xcrawl3r/blob/main/CONTRIBUTING.md).
 
 A big thank you to all the [contributors](https://github.com/hueristiq/xcrawl3r/graphs/contributors) for your ongoing support!
 
@@ -216,4 +300,4 @@ A big thank you to all the [contributors](https://github.com/hueristiq/xcrawl3r/
 
 ## Licensing
 
-This package is licensed under the [MIT license](https://opensource.org/license/mit). You are free to use, modify, and distribute it, as long as you follow the terms of the license. You can find the full license text in the repository - [Full MIT license text](https://github.com/hueristiq/xcrawl3r/blob/master/LICENSE).
+This package is licensed under the [MIT license](https://opensource.org/license/mit). You are free to use, modify, and distribute it, as long as you follow the terms of the license. You can find the full license text in the repository - [Full MIT license text](https://github.com/hueristiq/xcrawl3r/blob/main/LICENSE).
