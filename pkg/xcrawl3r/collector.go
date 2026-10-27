@@ -13,7 +13,7 @@ import (
 	"github.com/gocolly/colly/v2/extensions"
 	"github.com/gocolly/colly/v2/proxy"
 	hqgohttpheader "github.com/hueristiq/hq-lib-http-go/header"
-	hqgohttpuseragent "github.com/hueristiq/hq-lib-http-go/useragent"
+	hqgohttpuseragent "github.com/hueristiq/hq-lib-http-go/header/useragent"
 )
 
 func (c *Crawler) collector(ctx context.Context, scope *scope, results chan<- Result) (collector *colly.Collector, err error) {

@@ -6,11 +6,11 @@ require (
 	github.com/chromedp/cdproto v0.158.3
 	github.com/chromedp/chromedp v0.21.0
 	github.com/gocolly/colly/v2 v2.3.0
-	github.com/hueristiq/hq-lib-http-go v0.0.0-20261011140034-f591e873d968
-	github.com/hueristiq/hq-lib-limiter-go v0.0.0-20261011131819-8eb9d2ee722a
-	github.com/hueristiq/hq-lib-logger-go v0.0.0-20261011132023-c2e708c1233d
-	github.com/hueristiq/hq-lib-retrier-go v0.0.0-20261011132200-c4007130d81a
-	github.com/hueristiq/hq-lib-url-go v0.0.0-20261011135834-c92a0bfe9148
+	github.com/hueristiq/hq-lib-http-go v0.0.0-20261026220137-ec868dd9af6e
+	github.com/hueristiq/hq-lib-limiter-go v0.0.0-20261026191156-2c4933a3049d
+	github.com/hueristiq/hq-lib-logger-go v0.0.0-20261026191134-a58e3f934506
+	github.com/hueristiq/hq-lib-retrier-go v0.0.0-20261026191229-37cc6b1b9cd5
+	github.com/hueristiq/hq-lib-url-go v0.0.0-20261026191410-6f715a3fa85b
 	github.com/spf13/pflag v1.0.10
 	github.com/spf13/viper v1.21.0
 	golang.org/x/net v0.61.0
@@ -46,5 +46,3 @@ require (
 	google.golang.org/protobuf v1.36.12 // indirect
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
 )
-
-replace github.com/hueristiq/hq-lib-url-go => ../../libs/go/hq-lib-url-go
