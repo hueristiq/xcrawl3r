@@ -11,7 +11,7 @@ require (
 	github.com/hueristiq/hq-lib-logger-go v0.0.0-20261026191134-a58e3f934506
 	github.com/hueristiq/hq-lib-retrier-go v0.0.0-20261026191229-37cc6b1b9cd5
 	github.com/hueristiq/hq-lib-url-go v0.0.0-20261026191410-6f715a3fa85b
-	github.com/spf13/pflag v1.0.10
+	github.com/spf13/pflag v1.1.0
 	github.com/spf13/viper v1.21.0
 	golang.org/x/net v0.61.0
 	gopkg.in/yaml.v3 v3.0.1
